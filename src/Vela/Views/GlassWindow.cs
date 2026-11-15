@@ -124,10 +124,26 @@ public class GlassWindow : Window
 
     public double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;
 
+    bool _regionCleared;
+
     public void UpdateRegion()
     {
         if (Hwnd == IntPtr.Zero) return;
         var el = RegionElement;
+        if (RenderMode == "layered")
+        {
+            // Per-pixel alpha already makes transparent pixels click-through, so no Win32 region:
+            // regions are aliased (jagged corners). Clip the shape with an anti-aliased geometry instead.
+            if (!_regionCleared) { SetWindowRgn(Hwnd, IntPtr.Zero, true); _regionCleared = true; }
+            if (el != null && el.ActualWidth > 0)
+            {
+                double rad = RegionRadius;
+                var clip = new RectangleGeometry(new Rect(0, 0, el.ActualWidth, el.ActualHeight), rad, rad);
+                clip.Freeze();
+                el.Clip = clip;
+            }
+            return;
+        }
         Rect r;
         if (el == null || !el.IsLoaded || el.ActualWidth <= 0)
             r = new Rect(0, 0, ActualWidth, ActualHeight);

@@ -13,6 +13,7 @@ public static class Services
     public static Ticker Ticker { get; } = new();
 
     static readonly Lazy<SystemMonitor> _sys = new(() => new SystemMonitor());
+    static readonly Lazy<GpuMonitor> _gpu = new(() => new GpuMonitor());
     static readonly Lazy<AudioEndpoint> _speakers = new(() => new AudioEndpoint(0));
     static readonly Lazy<AudioEndpoint> _mic = new(() => new AudioEndpoint(1));
     static readonly Lazy<MediaService> _media = new(() => new MediaService());
@@ -20,6 +21,9 @@ public static class Services
     static readonly Lazy<ScreenTimeService> _screenTime = new(() => new ScreenTimeService());
     static readonly Lazy<BrightnessService> _brightness = new(() => new BrightnessService());
     static readonly Lazy<RadioService> _radios = new(() => new RadioService());
+    static readonly Lazy<WifiService> _wifi = new(() => new WifiService());
+    static readonly Lazy<BluetoothService> _bt = new(() => new BluetoothService());
+    static readonly Lazy<QuickSettingsService> _quick = new(() => new QuickSettingsService());
     static readonly Lazy<DataStore> _data = new(() => new DataStore());
     static readonly Lazy<IconCache> _icons = new(() => new IconCache());
     static readonly Lazy<WindowTracker> _windows = new(() => new WindowTracker());
@@ -30,6 +34,7 @@ public static class Services
     static readonly Lazy<StripeConnector> _stripe = new(() => new StripeConnector());
 
     public static SystemMonitor Sys => _sys.Value;
+    public static GpuMonitor Gpu => _gpu.Value;
     public static AudioEndpoint Speakers => _speakers.Value;
     public static AudioEndpoint Microphone => _mic.Value;
     public static MediaService Media { get { _media.Value.EnsureStarted(); return _media.Value; } }
@@ -37,6 +42,9 @@ public static class Services
     public static ScreenTimeService ScreenTime => _screenTime.Value;
     public static BrightnessService Brightness => _brightness.Value;
     public static RadioService Radios => _radios.Value;
+    public static WifiService Wifi => _wifi.Value;
+    public static BluetoothService Bluetooth => _bt.Value;
+    public static QuickSettingsService Quick => _quick.Value;
     public static DataStore Data => _data.Value;
     public static IconCache Icons => _icons.Value;
     public static WindowTracker Windows => _windows.Value;

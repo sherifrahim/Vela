@@ -22,7 +22,8 @@ namespace Vela.Widgets;
 /// </summary>
 public abstract class WidgetBase : Grid, IDisposable
 {
-    public const double TileHeight = 48;
+    /// <summary>Tile height in DIPs at size M (S/L scale the whole bar). Matches the reference dock: 42 tall, 12 radius.</summary>
+    public const double TileHeight = 42, TileRadius = 12;
 
     // ---------- edit mode (widget picker open): minus badges + drag to reorder ----------
     public static bool EditMode { get; private set; }
@@ -45,6 +46,10 @@ public abstract class WidgetBase : Grid, IDisposable
     int _tickCounter;
 
     public event Action<WidgetBase>? RemoveRequested;
+    /// <summary>Extra context-menu items added by a container (e.g. a stack adds "Unstack").</summary>
+    public Action<ContextMenu>? ExtraMenu { get; set; }
+    /// <summary>True while this widget lives inside a stack (it then has no remove badge of its own).</summary>
+    public bool InStack { get; internal set; }
 
     protected WidgetBase()
     {
@@ -57,9 +62,8 @@ public abstract class WidgetBase : Grid, IDisposable
         Tile = new Border
         {
             Height = TileHeight,
-            CornerRadius = new CornerRadius(14),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(10, 0, 10, 0),
+            CornerRadius = new CornerRadius(TileRadius),
+            Padding = new Thickness(9, 0, 9, 0),
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true,
         };
@@ -67,11 +71,11 @@ public abstract class WidgetBase : Grid, IDisposable
 
         _badge = new Border
         {
-            Width = 18, Height = 18, CornerRadius = new CornerRadius(9),
+            Width = 15, Height = 15, CornerRadius = new CornerRadius(7.5),
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(0, -3, -3, 0), Visibility = Visibility.Collapsed, Cursor = Cursors.Hand,
+            Margin = new Thickness(0, -2, -2, 0), Visibility = Visibility.Collapsed, Cursor = Cursors.Hand,
             Background = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A)),
-            Child = new Border { Width = 8, Height = 2, CornerRadius = new CornerRadius(1), Background = Brushes.White },
+            Child = new Border { Width = 7, Height = 1.6, CornerRadius = new CornerRadius(0.8), Background = Brushes.White },
             ToolTip = "Remove",
         };
         _badge.MouseLeftButtonDown += (_, e) => { e.Handled = true; RemoveRequested?.Invoke(this); };
@@ -92,6 +96,7 @@ public abstract class WidgetBase : Grid, IDisposable
         {
             UpdateTileBrush(false);
             Tile.SetResourceReference(Border.BorderBrushProperty, "Tile.Border");
+            Tile.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         }
         else
         {
@@ -137,9 +142,13 @@ public abstract class WidgetBase : Grid, IDisposable
 
     // ---------- config ----------
     protected string Cfg(string key, string fallback = "") => Instance.Config.TryGetValue(key, out var v) ? v : fallback;
+    /// <summary>Set by a container whose children are stored inside its own config (stacks).</summary>
+    internal Action? ConfigChanged { get; set; }
+
     protected void SetCfg(string key, string value)
     {
         Instance.Config[key] = value;
+        ConfigChanged?.Invoke();
         if (!IsPreview) Settings.Save();
     }
 
@@ -179,7 +188,7 @@ public abstract class WidgetBase : Grid, IDisposable
         try { OnTick(now); } catch (Exception ex) { Log.Error($"{GetType().Name}.OnTick", ex); }
     }
 
-    void OnEditModeChanged() => _badge.Visibility = EditMode && !IsPreview ? Visibility.Visible : Visibility.Collapsed;
+    void OnEditModeChanged() => _badge.Visibility = EditMode && !IsPreview && !InStack ? Visibility.Visible : Visibility.Collapsed;
 
     void UpdateTileBrush(bool hover)
     {
@@ -231,7 +240,11 @@ public abstract class WidgetBase : Grid, IDisposable
         var menu = new ContextMenu();
         AddMenuItems(menu);
         if (menu.Items.Count > 0) menu.Items.Add(new Separator());
-        menu.Items.Add(Item("Remove from dock", () => RemoveRequested?.Invoke(this)));
+        if (ExtraMenu != null) { ExtraMenu(menu); menu.Items.Add(new Separator()); }
+        else if (!InStack && Parent is Panel p && p.Children.IndexOf(this) is var i && i >= 0 && i + 1 < p.Children.Count
+                 && p.Children[i + 1] is WidgetBase next && next.Descriptor?.Type != "apps" && Descriptor?.Type != "apps")
+            menu.Items.Add(Item("Stack with next widget", () => DockWindow.For(this)?.StackWithNext(this)));
+        menu.Items.Add(Item(InStack ? "Remove from stack" : "Remove from dock", () => RemoveRequested?.Invoke(this)));
         menu.Items.Add(Item("Widgets…", () => DockWindow.Instance?.OpenWidgetPicker()));
         menu.Items.Add(Item("Settings", () => DockWindow.Instance?.OpenSettings()));
         ContextMenu = menu;

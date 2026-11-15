@@ -4,21 +4,29 @@ namespace Vela.Core;
 
 public sealed class AppSettings
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
 
     // Appearance
     public string Theme { get; set; } = "glass";      // see Theming/Palettes.cs
     public string Size { get; set; } = "M";           // S | M | L
     public string Accent { get; set; } = "#0A84FF";
     public string WidgetStyle { get; set; } = "auto"; // auto | black | white | glass  (tile fill override)
+    public string GlassEffect { get; set; } = "auto"; // auto (style decides) | off | frosted | liquid
+    public double GlassBlur { get; set; } = 50;       // 0–100: how blurred the background under the bar is
+    public bool GlassTiles { get; set; }               // tiles become frosted glass too (component blur)
 
     // Dock
     public string Edge { get; set; } = "bottom";      // bottom | top
     public double EdgeMargin { get; set; } = 4;
-    public double Spacing { get; set; } = 5;
+    public double Spacing { get; set; } = 6;
+    public string BarWidth { get; set; } = "full";     // full (edge to edge) | fit (hugs its content)
     public bool ReserveSpace { get; set; } = true;
     public string TaskbarMode { get; set; } = "hidden"; // hidden | autohide | keep
     public bool ShowAppNames { get; set; } = true;
+    public bool DesktopCorner { get; set; } = true;   // peek / show-desktop sliver at the far end
+    public string Displays { get; set; } = "all";     // all (a dock on every display) | primary
+    public bool Magnification { get; set; } = true;   // macOS-style icon magnification on hover
+    public double MagnifyAmount { get; set; } = 1.45; // largest icon scale (1.1–1.6)
     public bool Use24Hour { get; set; }
     public bool TrackScreenTime { get; set; } = true;
 
@@ -73,12 +81,30 @@ public static class Settings
             Current.FirstRunDone = true;
             SaveNow();
         }
+        Migrate();
+    }
+
+    /// <summary>One-time upgrades of an existing settings.json (bump AppSettings.Version for each).</summary>
+    static void Migrate()
+    {
+        if (Current.Version < 2)
+        {
+            // v2: the Control Centre (quick settings) joins the dock, just before the clock.
+            if (!Current.Widgets.Any(w => w.Type == "controlcenter"))
+            {
+                int at = Current.Widgets.FindIndex(w => w.Type == "clock");
+                Current.Widgets.Insert(at < 0 ? Current.Widgets.Count : at, new WidgetInstance { Type = "controlcenter" });
+            }
+            Current.Version = 2;
+            SaveNow();
+            Log.Info("Settings migrated to v2");
+        }
     }
 
     /// <summary>Default dock, modelled on the reference screenshot layout.</summary>
     public static List<WidgetInstance> DefaultLayout() => new[]
     {
-        "battery", "nowplaying.mini", "volume", "quicktoggles", "apps", "screentime", "claude", "clock",
+        "battery", "nowplaying.mini", "volume", "quicktoggles", "apps", "screentime", "claude", "controlcenter", "clock",
     }.Select(t => new WidgetInstance { Type = t }).ToList();
 
     public static void Save(string what = "")

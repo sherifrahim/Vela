@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Windows.Threading;
 using Vela.Core;
@@ -164,4 +165,43 @@ public sealed class WindowTracker
     }
 
     public static void OpenUri(string uri) => Launch(uri);
+
+    /// <summary>
+    /// Re-fits maximized windows on the dock's monitor that still extend past the work area (they were
+    /// maximized while the Windows taskbar was hidden, before the dock reserved its strip). Only resizable
+    /// (WS_THICKFRAME) windows: borderless fullscreen games / F11 browsers are left alone.
+    /// </summary>
+    static readonly Dictionary<IntPtr, int> FitAttempts = new();
+
+    public static void FitMaximizedToWorkArea(IntPtr dock)
+    {
+        try
+        {
+            var mi = GetMonitorFor(dock);
+            var work = mi.rcWork;
+            int fixedCount = 0;
+            EnumWindows((h, _) =>
+            {
+                if (h == dock || !IsWindowVisible(h) || IsIconic(h) || !IsZoomed(h) || IsCloaked(h)) return true;
+                long style = GetWindowLongPtr(h, GWL_STYLE).ToInt64();
+                if ((style & 0x00040000L) == 0) return true; // WS_THICKFRAME
+                if (MonitorFromWindow(h, 2) != MonitorFromWindow(dock, 2)) return true;
+                if (!GetWindowRect(h, out var r)) return true;
+                if (DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT f, Marshal.SizeOf<RECT>()) != 0) f = r;
+                if (f.Bottom <= work.Bottom + 1 && f.Top >= work.Top - 1) return true;
+                // Some apps insist on their size; try a couple of times, then leave them alone.
+                FitAttempts.TryGetValue(h, out int n);
+                if (n >= 2) return true;
+                FitAttempts[h] = n + 1;
+                // Keep the window's invisible resize borders outside the work area, as Windows does.
+                int dl = f.Left - r.Left, dt = f.Top - r.Top, dr = r.Right - f.Right, db = r.Bottom - f.Bottom;
+                SetWindowPos(h, IntPtr.Zero, work.Left - dl, work.Top - dt,
+                    work.Right - work.Left + dl + dr, work.Bottom - work.Top + dt + db, SWP_NOZORDER | SWP_NOACTIVATE);
+                fixedCount++;
+                Log.Info($"Fitted a maximized {GetClassNameOf(h)} window to the work area (attempt {n + 1})");
+                return true;
+            }, IntPtr.Zero);
+        }
+        catch (Exception ex) { Log.Error("FitMaximizedToWorkArea", ex); }
+    }
 }

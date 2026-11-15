@@ -10,14 +10,25 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [x] Five styles, accent colours, S/M/L, widget-tile override, wallpaper-based glass
 - [x] Widget picker (categories, search, live previews, checkmarks), edit-mode minus badges
 - [x] Settings window (appearance, dock, weather, connectors, privacy, about)
+- [x] Reference proportions: 42 DIP tiles, 3 DIP bar padding, hairline borders, 12/16 radii, reference type scale
+- [x] Full-width bar (edge to edge, rounded ends) + "fit content" option; apps centred on screen (`DockRow`)
+- [x] Anti-aliased rounded corners (geometry clip instead of a Win32 region) + soft bar shadow
+- [x] Maximized windows re-fitted above the dock (`FitMaximizedToWorkArea`)
+- [x] Cards open directly over their widget (Left/Top in DIPs) — verified: Bluetooth, Wi-Fi, Control Centre
+- [x] Dynamic fit: row scales down (≥ 60 %) when it doesn't fit the display (seen at 86 % on the 1080p screen)
+- [x] Dock on every display (`Displays = all`), layouts kept in sync — verified on 2 displays
+- [x] macOS magnification with neighbour falloff + size slider — verified
+- [x] Control panel (sidebar: General, Appearance, Dock, Widgets, Apps, Weather, Connectors, Privacy, About)
+- [~] Drag any widget to reorder (any time) + drag app icons to reorder pins (code done, not hand-tested)
+- [~] Widget stacks: "Stack with next widget", scroll to flip, auto-rotate, Unstack (not hand-tested)
+- [~] Glass options: Frosted / Liquid Glass / blur strength / glass tiles (not visually checked yet)
+- [~] Desktop corner: hover = peek (undocumented DWM call), click = show desktop (peek not verified)
 - [~] Top edge + drag-to-snap (code done, not yet tested by hand)
-- [~] Drag to reorder widgets while picker is open (code done, not tested by hand)
-- [~] Fullscreen hide/restore (code done; test with a game / F11 video)
-- [~] Cards slide out over their widget (seen working in code path; verify each card visually)
+- [~] Fullscreen hide/restore (code done; test with a game / F11 video), now per display
 - [ ] Tooltips should open *below* when the dock is on top (ToolTip style uses Placement=Top)
 - [ ] Auto-hide dock mode (slide away, reveal at edge, "show on desktop", Win key reveal)
-- [ ] Mac-style magnification (hover scale exists per icon; add neighbour falloff + size slider)
-- [ ] Narrow / full-width bar variants; padding setting
+- [ ] Magnified icons may grow above the bar (needs a taller transparent window band + clip changes)
+- [ ] Per-display app filtering ("show only windows on this display") for secondary docks
 - [ ] Lock dock setting
 
 ## P1 — apps (taskbar parity)
@@ -34,13 +45,18 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [ ] Tray icons grid (needs Shell_NotifyIcon hosting or reading the tray toolbar — research)
 
 ## P1 — widgets
-Done (41): clock, clock.digital, date, dayprogress, monthprogress, yearprogress, screentime, pomodoro, timer,
+Done (45): clock, clock.digital, date, calendar, dayprogress, monthprogress, yearprogress, screentime, pomodoro, timer,
 stopwatch, todos, notes, currency, sysstats, cpu, ram, network, battery, battery.dots, battery.ring,
-quicktoggles, brightness, themetoggle, notifications, showdesktop, taskmanager, apps, storage, recyclebin,
-nowplaying, nowplaying.mini, volume, microphone, claude, codex, ailimits, stripe, crypto, weather, weather.sun, github.
+quicktoggles, controlcenter, sysmon, brightness, themetoggle, notifications, showdesktop, taskmanager, apps, storage, recyclebin,
+nowplaying, nowplaying.mini, nowplaying.art, volume, microphone, claude, codex, ailimits, stripe, crypto, weather, weather.sun, github.
 
 Todo, roughly by value:
-- [ ] Calendar (next event) — Outlook/Windows calendar via `Windows.ApplicationModel.Appointments` first, Google later
+- [x] Wi-Fi card (scan, connect with key, disconnect) + Bluetooth card (paired + battery %, discovery, pair, remove) — verified
+- [x] Control Centre (Windows quick settings: radios, airplane, dark mode, mic, battery saver, power mode, brightness, volume)
+- [x] System Monitor (CPU / GPU / RAM / network + card with top processes)
+- [ ] Calendar next event — Windows `Appointments` API needs package identity; Google Calendar via OAuth later
+- [ ] Volume card: per-app mixer (IAudioSessionManager2) + output device switch (IPolicyConfig)
+- [ ] Connect/disconnect paired Bluetooth audio (no public API; investigate KS reconnect like ToothTray)
 - [ ] Do Not Disturb toggle (Focus Assist: `WNF`/quiet hours APIs — research), Keyboard (osk.exe), Language (keyboard layout switch)
 - [ ] Top CPU / Top RAM tiles (per-process CPU% needs two samples; reuse SystemMonitor ticks)
 - [ ] Temperature (WMI MSAcpi_ThermalZoneTemperature needs admin → research LibreHardwareMonitor-style alternatives)
@@ -73,7 +89,7 @@ Todo, roughly by value:
 
 ## Engineering
 - [ ] Unit tests (xUnit) for pure logic: Claude/Codex log parsing, Fmt, WallpaperGlass mapping, Stripe summing
-- [ ] Settings migration framework (`AppSettings.Version`)
+- [x] Settings migration framework (`Settings.Migrate`, `AppSettings.Version` = 2)
 - [ ] App icon (.ico) + version resource; MSIX or Inno Setup installer; auto-start toggle verified
 - [ ] Multi-monitor: choose display; per-monitor DPI changes while running
 - [ ] Make the `chrome` render mode work (no region, exact-size window, DWM rounded corners) and compare CPU/memory

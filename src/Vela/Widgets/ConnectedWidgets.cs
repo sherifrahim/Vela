@@ -14,16 +14,16 @@ namespace Vela.Widgets;
 static class BrandBadges
 {
     // Generic marks (not the companies' logos): a coral square with a burst, a dark square with a prompt.
-    public static FrameworkElement Claude(double size = 36)
+    public static FrameworkElement Claude(double size = 32)
     {
         var b = Badge(new BurstMark { Width = size * 0.6, Height = size * 0.6 }, Brush("#D97757"), size, size * 0.26);
         return b;
     }
 
-    public static FrameworkElement Codex(double size = 36) =>
+    public static FrameworkElement Codex(double size = 32) =>
         Badge(Text(">_", size * 0.36, FontWeights.Bold, "OnAccent").Center(), Brush("#10A37F"), size, size * 0.26);
 
-    public static FrameworkElement GitHub(double size = 30) =>
+    public static FrameworkElement GitHub(double size = 28) =>
         Badge(Icon(Glyphs.Code, size * 0.48, "OnAccent"), Brush("#24292F"), size, size * 0.28);
 
     public static FrameworkElement Stripe(double size = 18) =>
@@ -56,23 +56,24 @@ public abstract class UsageTileBase : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        var grid = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 2, 0) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+        var grid = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 1, 0) };
+        // Reference columns: label | bar | reset time | value.
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
         for (int r = 0; r < 3; r++)
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(13) });
-            _labels[r] = Text("", 10, FontWeights.Bold).Row(r);
-            _resets[r] = Text("", 8.5, null, "Text.Secondary").Row(r).Col(2).Right();
-            _resets[r].Margin = new Thickness(0, 0, 4, 0);
-            _values[r] = Text("", 10, FontWeights.Bold).Row(r).Col(3).Right();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(11.5) });
+            _labels[r] = Text("", 8.5, FontWeights.Bold).Row(r);
+            _resets[r] = Text("", 7, null, "Text.Secondary").Row(r).Col(2).Right();
+            _resets[r].Margin = new Thickness(0, 0, 3, 0);
+            _values[r] = Text("", 8.5, FontWeights.Bold).Row(r).Col(3).Right();
             grid.Children.Add(_labels[r]); grid.Children.Add(_resets[r]); grid.Children.Add(_values[r]);
             if (r < 2)
             {
-                var bar = Progress(out _setters[r], "Sys.Green", 4).Row(r).Col(1);
-                bar.Margin = new Thickness(0, 0, 4, 0);
+                var bar = Progress(out _setters[r], "Sys.Green", 3).Row(r).Col(1);
+                bar.Margin = new Thickness(0, 0, 3, 0);
                 grid.Children.Add(bar);
             }
         }
@@ -130,9 +131,9 @@ public sealed class ClaudeWidget : UsageTileBase
             rows.Children.Add(V(msg, hint).Margin(0, 0, 0, 16));
         }
         var tokens = Columns("*,*,*",
-            V(Caption("Today"), Value(Fmt.Tokens(c.TokensToday), 18)),
-            V(Caption("7 days"), Value(Fmt.Tokens(c.TokensWeek), 18)),
-            V(Caption("Most used"), Value(c.TopModel ?? "—", 18)));
+            V(Label("Today"), Value(Fmt.Tokens(c.TokensToday), 18)),
+            V(Label("7 days"), Value(Fmt.Tokens(c.TokensWeek), 18)),
+            V(Label("Most used"), Value(c.TopModel ?? "—", 18)));
         tokens.Margin = new Thickness(0, 4, 0, 18);
         return V(Card.Header("Claude", BrandBadges.Claude(30), c.Plan), rows, tokens,
             Card.Footer("Read from your Claude Code sign-in.", "Refresh", async () => { await c.RefreshAsync(); RefreshCard(); }));
@@ -183,12 +184,12 @@ public sealed class AiLimitsWidget : WidgetBase
     {
         FrameworkElement Row(FrameworkElement badge, out Action<double> set, out TextBlock v)
         {
-            var bar = Progress(out set, "Sys.Green", 4);
-            bar.Width = 70;
-            v = Text("—", 10.5, FontWeights.Bold).Margin(6, 0, 0, 0);
+            var bar = Progress(out set, "Sys.Green", 3);
+            bar.Width = 64;
+            v = Text("—", 8.5, FontWeights.Bold).Margin(6, 0, 0, 0);
             return H(badge, bar.Margin(6, 0, 0, 0), v);
         }
-        return V(Row(BrandBadges.Claude(16), out _a, out _av).Margin(0, 0, 0, 4), Row(BrandBadges.Codex(16), out _b, out _bv));
+        return V(Row(BrandBadges.Claude(14), out _a, out _av).Margin(0, 0, 0, 4), Row(BrandBadges.Codex(14), out _b, out _bv));
     }
 
     protected override void OnAttach() { Svc.Claude.Changed += Render; Svc.Codex.Changed += Render; Render(); }
@@ -203,8 +204,8 @@ public sealed class AiLimitsWidget : WidgetBase
     }
 
     protected override void OnClick() => FlyoutWindow.Toggle(this, V(Card.Header("AI Limits"),
-        Caption("Claude"), Card.UsageRow("Session", Svc.Claude.Session?.Percent ?? 0, Fmt.ResetsIn(Svc.Claude.Session?.ResetsAt)),
-        Caption("ChatGPT"), Card.UsageRow("Session", Svc.Codex.Windows.FirstOrDefault()?.Percent ?? 0, Fmt.ResetsIn(Svc.Codex.Windows.FirstOrDefault()?.ResetsAt))), 360);
+        Label("Claude"), Card.UsageRow("Session", Svc.Claude.Session?.Percent ?? 0, Fmt.ResetsIn(Svc.Claude.Session?.ResetsAt)),
+        Label("ChatGPT"), Card.UsageRow("Session", Svc.Codex.Windows.FirstOrDefault()?.Percent ?? 0, Fmt.ResetsIn(Svc.Codex.Windows.FirstOrDefault()?.ResetsAt))), 360);
 }
 
 /// <summary>"$15 · net revenue - 30 days" (Stripe).</summary>
@@ -214,14 +215,14 @@ public sealed class StripeWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _value = Value("—", 19);
-        _sub = Text("net revenue · 30 days", 9.5, FontWeights.SemiBold, "Text.Secondary");
+        _value = Value("—", 15);
+        _sub = Text("net revenue · 30 days", 7, FontWeights.SemiBold, "Text.Secondary");
         var g = new Grid();
-        g.Children.Add(V(_value, _sub).Margin(2, 0, 26, 0));
-        var badge = BrandBadges.Stripe();
+        g.Children.Add(V(_value, _sub).Margin(1, 0, 22, 0));
+        var badge = BrandBadges.Stripe(13);
         badge.HorizontalAlignment = HorizontalAlignment.Right;
         badge.VerticalAlignment = VerticalAlignment.Top;
-        badge.Margin = new Thickness(0, 6, 0, 0);
+        badge.Margin = new Thickness(0, 5, 0, 0);
         g.Children.Add(badge);
         return g;
     }
@@ -244,7 +245,7 @@ public sealed class StripeWidget : WidgetBase
         var chart = new Sparkline("Accent") { Height = 70, Bars = true, Margin = new Thickness(0, 8, 0, 6) };
         chart.SetValues(s.Daily);
         return V(Card.Header("Stripe", BrandBadges.Stripe(28), s.TestMode ? "Test mode" : null),
-            Caption("Net revenue · last 30 days"), Value(s.Display, 30), chart, Text("Last 14 days", 11, null, "Text.Tertiary"),
+            Label("Net revenue · last 30 days"), Value(s.Display, 30), chart, Text("Last 14 days", 11, null, "Text.Tertiary"),
             Card.Footer(s.Status, "Disconnect", () => { Secrets.Set(s.SecretName!, null); FlyoutWindow.CloseCurrent(); }));
     }
 
@@ -261,9 +262,9 @@ public sealed class GitHubWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _count = Value("—", 18);
-        _sub = Text("notifications", 9.5, FontWeights.SemiBold, "Text.Secondary");
-        return H(BrandBadges.GitHub(), V(_count, _sub).Margin(10, 0, 4, 0));
+        _count = Value("—", 15);
+        _sub = Text("notifications", 7.5, FontWeights.SemiBold, "Text.Secondary");
+        return H(BrandBadges.GitHub(), V(_count, _sub).Margin(8, 0, 3, 0));
     }
 
     protected override void OnAttach() { Svc.GitHub.Changed += Render; Render(); }
@@ -315,10 +316,10 @@ public sealed class CryptoWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _sym = Text("", 10.5, FontWeights.Bold, "Text.Secondary");
-        _price = Text("…", 16, FontWeights.Bold);
-        _chg = Text("", 10.5, FontWeights.Bold);
-        _line = new Sparkline("Sys.Green") { Width = 56, Height = 24, Margin = new Thickness(12, 0, 2, 0) };
+        _sym = Text("", 8.5, FontWeights.Bold, "Text.Secondary");
+        _price = Text("…", 14, FontWeights.Bold);
+        _chg = Text("", 8.5, FontWeights.Bold);
+        _line = new Sparkline("Sys.Green") { Width = 50, Height = 20, Margin = new Thickness(10, 0, 0, 0) };
         return H(V(H(_sym, _chg.Margin(6, 0, 0, 0)), _price).Margin(2, 0, 0, 0), _line);
     }
 
@@ -357,12 +358,12 @@ public sealed class WeatherWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _icon = new WeatherIcon { Width = 30, Height = 30 };
-        _temp = Value("—", 20);
-        _hl = Text("", 10, FontWeights.SemiBold, "Text.Secondary");
-        _city = Text("", 10, FontWeights.SemiBold, "Text.Secondary");
+        _icon = new WeatherIcon { Width = 24, Height = 24 };
+        _temp = Value("—", 16);
+        _hl = Text("", 7.5, FontWeights.SemiBold, "Text.Secondary");
+        _city = Text("", 8.5, FontWeights.Bold);
         _city.MaxWidth = 90;
-        return H(_icon, _temp.Margin(8, 0, 10, 0), V(_city, _hl));
+        return H(_icon, _temp.Margin(6, 0, 8, 0), V(_city, _hl));
     }
 
     protected override void OnAttach() { Svc.Weather.Changed += Render; Render(); }
@@ -389,9 +390,9 @@ public sealed class WeatherWidget : WidgetBase
         bigIcon.Set(WeatherService.Kind(w.Code), !w.IsDay);
         var head = H(bigIcon, V(Value($"{w.Temp:0}°", 36), Text(WeatherService.Describe(w.Code), 13, FontWeights.SemiBold, "Text.Secondary")).Margin(14, 0, 0, 0));
         var details = Columns("*,*,*",
-            V(Caption("Feels like"), Text($"{w.FeelsLike:0}°", 14, FontWeights.Bold)),
-            V(Caption("Wind"), Text($"{w.Wind:0} {(w.Unit == "F" ? "mph" : "km/h")}", 14, FontWeights.Bold)),
-            V(Caption("Humidity"), Text($"{w.Humidity}%", 14, FontWeights.Bold)));
+            V(Label("Feels like"), Text($"{w.FeelsLike:0}°", 14, FontWeights.Bold)),
+            V(Label("Wind"), Text($"{w.Wind:0} {(w.Unit == "F" ? "mph" : "km/h")}", 14, FontWeights.Bold)),
+            V(Label("Humidity"), Text($"{w.Humidity}%", 14, FontWeights.Bold)));
         details.Margin = new Thickness(0, 14, 0, 0);
 
         var hours = new UniformGrid6();
@@ -426,9 +427,9 @@ public sealed class SunWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _arc = new SunArc { Width = 64, Height = 30 };
-        _rise = Text("", 10, FontWeights.SemiBold, "Text.Secondary");
-        _set = Text("", 10, FontWeights.SemiBold, "Text.Secondary");
+        _arc = new SunArc { Width = 54, Height = 24 };
+        _rise = Text("", 8, FontWeights.SemiBold, "Text.Secondary");
+        _set = Text("", 8, FontWeights.SemiBold, "Text.Secondary");
         return H(_arc, V(_rise, _set).Margin(10, 0, 2, 0));
     }
 

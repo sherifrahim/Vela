@@ -4,6 +4,65 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-15 — Claude (Opus 5.5) — session 2: reference proportions, full-width bar, cards, control centre, multi-display
+
+**Owner feedback this session:** dock looked "chunky / cheap knockoff", didn't span the screen, sat on top of
+apps; cards opened mid-screen; Wi-Fi/BT opened Windows Settings; wanted a control panel, quick settings,
+peek/show desktop, Mac-style magnification, rearrange anything, glass options, stacks, system metrics,
+Bluetooth battery, clock → Clock app / calendar → calendar, a dock on every display.
+
+**Git:** history rewritten on request — `main` is now a single root commit `6abe471` (same tree as the old
+`addfea4`). The remote (`sherifrahim/Vela`) still has the old 4-commit history; publishing needs a force-push,
+which the owner has not approved yet. This session's work is committed on `main` (owner asked), not pushed.
+
+**Changed**
+- Measured the reference (`reference/lumabar/assets/desktop-preview.webp`: 1 px there ≈ 1 DIP on the owner's
+  2560×1600 @175 % screen) and re-tuned everything: tile 42 DIP / radius 12, bar padding 3 / radius 16,
+  `Hairline` (1 physical px) borders, type scale (captions 8.5, values 16, clock 12.5, notes 7). All widgets re-sized.
+- Full-width bar (`BarWidth` full|fit), `Views/DockRow.cs` (apps centred on screen, widgets hug the ends),
+  dynamic fit (row scales ≥ 60 % when too wide), soft shadow, anti-aliased corners (no Win32 region any more).
+- `WindowTracker.FitMaximizedToWorkArea`: windows maximized before Vela hid the taskbar are re-fitted.
+- `FlyoutWindow`: positioned via Left/Top DIPs over the anchor (fixes mid-screen cards); `Navigate()`; opaque
+  panels; memory trim 4 s after cards close.
+- New: `Services/Connectivity.cs` (WifiService, BluetoothService incl. battery %, QuickSettingsService power mode),
+  `Views/QuickCards.cs` (Wi-Fi card, Bluetooth card, Control Centre), `GpuMonitor` (PDH),
+  `Widgets/StackWidget.cs`, widgets `controlcenter`, `sysmon`, `calendar`, `nowplaying.art`.
+- Desktop corner (peek + show desktop), drag-to-reorder any time, drag app icons to reorder/pin,
+  macOS magnification (`AppsWidget` MagFrame), blue Windows 11 Start mark, watch icon for Screen Time.
+- Glass options: `GlassEffect` auto|off|frosted|liquid, `GlassBlur`, `GlassTiles` (Theme.cs + WallpaperGlass vibrancy).
+- Control panel rewrite (`Views/SettingsWindow.cs`, sidebar pages incl. Widgets/Apps management).
+- Multi-display: one `DockWindow` per display (`DockWindow.All`, `For()`, `SyncDisplays`, `SaveWidgets`).
+- Settings migration framework (`Settings.Migrate`, v2 adds `controlcenter` before the clock).
+- Clock: date half → calendar card (+ "Open Calendar"), time half → Windows Clock app (`ms-clock:`).
+- All source files normalised to LF (git already stored LF; no content diff).
+
+**Verified on the owner's PC** (screenshots + synthetic clicks)
+- Builds 0 warnings / 0 errors; no ERROR lines in vela.log.
+- Dock: full width with rounded ends, apps centred, new proportions; second dock on DISPLAY2 (1920×1080 @100 %,
+  auto-scaled to 86 %).
+- Bluetooth card opens above the BT pill, lists the paired WH-CH720N; Wi-Fi card lists real networks with
+  the connected one first; Control Centre opens above its tile (power mode, brightness, volume live).
+- Control panel renders (General page). Magnification falloff visible on hover.
+- Idle with two docks: 31 ms CPU / 10 s, working set 38 MB, private 151 MB.
+
+**Not verified yet**
+- Glass Frosted/Liquid/blur slider/glass tiles visually; widget stacks; drag-reorder of widgets and pins;
+  desktop peek (undocumented DWM call); Bluetooth pairing of a new device; Wi-Fi connect with a key;
+  battery % (depends on the headset reporting it); top edge; fullscreen hiding per display; the other
+  control-panel pages; `sysmon`, `calendar`, `nowplaying.art` tiles in the dock.
+
+**Next up (in order)**
+1. Hand-test the "Not verified" list; fix what breaks (start with stacks + glass options).
+2. `Views/QuickCards.cs`: volume/mixer card (IAudioSessionManager2 per-app volume, IPolicyConfig output switch).
+3. Let magnified icons rise above the bar: taller transparent window band in `DockWindow.Reposition`, move the
+   clip from `Bar` to the tile layer, keep the appbar reservation unchanged.
+4. Secondary docks: optional "only this display's windows" filter in `AppsWidget.BuildGroups` (MonitorFromWindow).
+5. More reference widgets (picker categories Analytics, Social, Stocks): weather variants, world clocks,
+   flip clock, Polar/Lemon Squeezy/Gumroad revenue, YouTube, Plausible.
+6. Tooltips below the bar when docked at top; auto-hide dock mode.
+
+---
+
 ## 2026-11-15 — Claude (Opus 5.5) — session 1: from zero to a working dock
 
 **Context discovered**

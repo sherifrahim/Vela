@@ -21,11 +21,10 @@ public sealed class ScreenTimeWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        var badge = Badge(Icon(Glyphs.Clock, 15, "OnAccent"), null, 30, 9);
-        badge.Bg("Accent");
+        var watch = new WatchIcon { Width = 14, Height = 24, Margin = new Thickness(3, 0, 0, 0) };
         _value = Value("0m");
-        _bars = new Sparkline("Accent") { Bars = true, Width = 62, Height = 24, Margin = new Thickness(14, 6, 2, 0) };
-        return H(badge, V(Caption("Screen Time"), _value).Margin(10, 0, 0, 0), _bars);
+        _bars = new Sparkline("Accent") { Bars = true, Baseline = true, Width = 52, Height = 18, Margin = new Thickness(16, 7, 1, 0) };
+        return H(watch, V(Caption("Screen Time"), _value.Margin(0, -2, 0, 0)).Margin(11, 0, 0, 0), _bars);
     }
 
     protected override void OnTick(DateTime now)
@@ -58,7 +57,7 @@ public sealed class ScreenTimeWidget : WidgetBase
         if (top.Count == 0) list.Children.Add(Text("Nothing tracked yet today.", 12.5, null, "Text.Secondary"));
         var total = Value(Fmt.Duration(TimeSpan.FromSeconds(d.Total)), 30);
         var note = Text("Kept on this PC only.", 11, null, "Text.Tertiary").Margin(0, 6, 0, 0);
-        return V(Card.Header("Screen Time"), Caption("Today"), total, chart, axis, list, note);
+        return V(Card.Header("Screen Time"), Label("Today"), total, chart, axis, list, note);
     }
 
     protected override void AddMenuItems(ContextMenu menu) =>
@@ -76,15 +75,15 @@ public abstract class TimerTileBase : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        Tile.BorderThickness = new Thickness(2);
+        Tile.BorderThickness = new Thickness(1.6);
         Tile.SetResourceReference(Border.BorderBrushProperty, ColorKey);
-        Label = Text(Title, 11.5, FontWeights.Bold, ColorKey);
-        Sub = Text("", 11, FontWeights.SemiBold, "Text.Secondary").Margin(5, 0, 0, 0);
-        Time = Text("0:00", 22, FontWeights.Bold);
-        Time.Margin = new Thickness(0, -3, 0, 0);
-        PlayButton = CircleButton(Glyphs.Play, TogglePlay, 32, ColorKey, "OnAccent", 12);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        if (ExtraButton is { } extra) { buttons.Children.Add(extra); ((FrameworkElement)extra).Margin = new Thickness(0, 0, 6, 0); }
+        Label = Text(Title, 8.5, FontWeights.Bold, ColorKey);
+        Sub = Text("", 8.5, FontWeights.SemiBold, "Text.Secondary").Margin(4, 0, 0, 0);
+        Time = Text("0:00", 17, FontWeights.Bold);
+        Time.Margin = new Thickness(0, -2, 0, 0);
+        PlayButton = CircleButton(Glyphs.Play, TogglePlay, 26, ColorKey, "OnAccent", 9.5);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        if (ExtraButton is { } extra) { buttons.Children.Add(extra); ((FrameworkElement)extra).Margin = new Thickness(0, 0, 5, 0); }
         buttons.Children.Add(PlayButton);
         return H(V(H(Label, Sub), Time).Margin(2, 0, 0, 0), buttons);
     }
@@ -111,7 +110,7 @@ public sealed class PomodoroWidget : TimerTileBase
     protected override string ColorKey => "Sys.Red";
     protected override string Title => "Focus";
     protected override int TickSeconds => 1;
-    protected override UIElement? ExtraButton => CircleButton(Glyphs.Next, Skip, 32, "Fill.Control", "Text.Primary", 11).Tip("Skip");
+    protected override UIElement? ExtraButton => CircleButton(Glyphs.Next, Skip, 26, "Fill.Control", "Text.Primary", 9).Tip("Skip");
 
     int FocusMin => int.TryParse(Cfg("focus", "25"), out var v) ? v : 25;
     int BreakMin => int.TryParse(Cfg("break", "5"), out var v) ? v : 5;
@@ -279,11 +278,11 @@ public sealed class TodosWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _ring = new RingGauge("Accent") { Width = 32, Height = 32, Thickness = 3.5 };
-        _count = Text("0", 12, FontWeights.Bold).Center();
-        var ring = new Grid { Width = 32, Height = 32 };
+        _ring = new RingGauge("Accent") { Width = 28, Height = 28, Thickness = 3 };
+        _count = Text("0", 10, FontWeights.Bold).Center();
+        var ring = new Grid { Width = 28, Height = 28 };
         ring.Children.Add(_ring); ring.Children.Add(_count);
-        _list = new StackPanel { Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, MinWidth = 70 };
+        _list = new StackPanel { Margin = new Thickness(10, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center, MinWidth = 64 };
         return H(ring, _list);
     }
 
@@ -297,8 +296,8 @@ public sealed class TodosWidget : WidgetBase
         _count.Text = open.Count.ToString();
         _ring.Value = todos.Count == 0 ? 0 : (double)(todos.Count - open.Count) / todos.Count;
         _list.Children.Clear();
-        foreach (var t in open.Take(2)) _list.Children.Add(Row(t, 12, 110));
-        if (open.Count == 0) _list.Children.Add(Text(todos.Count == 0 ? "Add a todo" : "All done", 12, FontWeights.SemiBold, "Text.Secondary"));
+        foreach (var t in open.Take(2)) _list.Children.Add(Row(t, 9, 100));
+        if (open.Count == 0) _list.Children.Add(Text(todos.Count == 0 ? "Add a todo" : "All done", 9, FontWeights.SemiBold, "Text.Secondary"));
     }
 
     static FrameworkElement Row(TodoItem t, double size, double maxWidth)
@@ -357,12 +356,12 @@ public sealed class NotesWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _title = Text("", 12.5, FontWeights.Bold);
-        _title.MaxWidth = 130;
-        _preview = Text("", 10.5, null, "Text.Secondary");
-        _preview.MaxWidth = 130;
-        var edit = CircleButton(Glyphs.Edit, () => OpenCard(), 28, "Fill.Control", "Text.Primary", 11).Margin(12, 0, 0, 0);
-        return H(NotepadIcon(30), V(_title, _preview).Margin(10, 0, 0, 0), edit);
+        _title = Text("", 9.5, FontWeights.Bold);
+        _title.MaxWidth = 110;
+        _preview = Text("", 8, null, "Text.Secondary");
+        _preview.MaxWidth = 110;
+        var edit = CircleButton(Glyphs.Edit, () => OpenCard(), 22, "Fill.Control", "Text.Primary", 9).Margin(10, 0, 0, 0);
+        return H(NotepadIcon(28), V(_title, _preview).Margin(8, 0, 0, 0), edit);
     }
 
     /// <summary>Yellow-header notepad drawn in vectors.</summary>
@@ -459,13 +458,13 @@ public sealed class CurrencyWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _amount = Text("", 12.5, FontWeights.SemiBold, "Text.Secondary");
-        _result = Text("…", 18, FontWeights.Bold);
-        _from = Text("", 10.5, FontWeights.Bold);
-        _to = Text("", 10.5, FontWeights.Bold);
-        Border Pill(TextBlock t) => new Border { CornerRadius = new CornerRadius(7), Padding = new Thickness(7, 1, 7, 1), Child = t, HorizontalAlignment = HorizontalAlignment.Center }.Bg("Fill.Control");
-        var swap = Text("⇅", 10, FontWeights.Bold, "Text.Secondary").Center();
-        return H(V(_amount, _result).Margin(2, 0, 16, 0), V(Pill(_from), swap, Pill(_to)));
+        _amount = Text("", 9.5, FontWeights.SemiBold, "Text.Secondary");
+        _result = Text("…", 14, FontWeights.Bold);
+        _from = Text("", 7.5, FontWeights.Bold);
+        _to = Text("", 7.5, FontWeights.Bold);
+        Border Pill(TextBlock t) => new Border { CornerRadius = new CornerRadius(5), Padding = new Thickness(5, 0, 5, 0.5), Child = t, HorizontalAlignment = HorizontalAlignment.Center }.Bg("Fill.Control");
+        var swap = Text("⇅", 7.5, FontWeights.Bold, "Text.Secondary").Center();
+        return H(V(_amount, _result).Margin(1, 0, 14, 0), V(Pill(_from), swap, Pill(_to)));
     }
 
     protected override async void OnTick(DateTime now)

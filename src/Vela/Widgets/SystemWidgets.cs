@@ -16,11 +16,12 @@ namespace Vela.Widgets;
 
 static class Rings
 {
-    public static (Grid host, RingGauge ring, TextBlock value) Make(string label, string fill, double size = 38)
+    public static (Grid host, RingGauge ring, TextBlock value) Make(string label, string fill, double size = 34)
     {
-        var ring = new RingGauge(fill) { Width = size, Height = size, Thickness = 3.5 };
-        var value = Text("0", 12.5, FontWeights.Bold).Center();
-        var lbl = Text(label, 7.5, FontWeights.Bold, "Text.Secondary").Center();
+        var ring = new RingGauge(fill) { Width = size, Height = size, Thickness = 3 };
+        var value = Text("0", 10.5, FontWeights.Bold).Center();
+        var lbl = Text(label, 5.5, FontWeights.Bold, "Text.Secondary").Center();
+        lbl.Margin = new Thickness(0, -2, 0, 0);
         var stack = V(value, lbl);
         stack.HorizontalAlignment = HorizontalAlignment.Center;
         var g = new Grid { Width = size, Height = size };
@@ -41,7 +42,7 @@ public sealed class SystemStatsWidget : WidgetBase
         var c = Rings.Make("CPU", "Accent");
         var r = Rings.Make("RAM", "Accent");
         (_cpu, _cpuV, _ram, _ramV) = (c.ring, c.value, r.ring, r.value);
-        r.host.Margin = new Thickness(8, 0, 0, 0);
+        r.host.Margin = new Thickness(6, 0, 0, 0);
         return H(c.host, r.host);
     }
 
@@ -70,7 +71,7 @@ public sealed class SingleStatWidget : WidgetBase
     {
         var r = Rings.Make(_stat == Stat.Cpu ? "CPU" : "RAM", "Accent");
         (_ring, _v) = (r.ring, r.value);
-        _sub = Text("", 10.5, FontWeights.SemiBold, "Text.Secondary");
+        _sub = Text("", 9, FontWeights.SemiBold);
         return H(r.host, V(Caption(_stat == Stat.Cpu ? "Processor" : "Memory"), _sub).Margin(8, 0, 2, 0));
     }
 
@@ -109,9 +110,9 @@ static class SystemCard
         }
         catch { }
         return V(Card.Header("System"),
-            Columns("*,auto", Caption("CPU"), Text($"{s.Cpu:0}%", 13, FontWeights.Bold)), cpuLine,
-            Columns("*,auto", Caption("Memory"), Text($"{s.RamUsedGb:0.0} of {s.RamTotalGb:0} GB", 13, FontWeights.Bold)).Margin(0, 0, 0, 12),
-            Caption("Top memory"), list.Margin(0, 6, 0, 0),
+            Columns("*,auto", Label("CPU"), Text($"{s.Cpu:0}%", 13, FontWeights.Bold)), cpuLine,
+            Columns("*,auto", Label("Memory"), Text($"{s.RamUsedGb:0.0} of {s.RamTotalGb:0} GB", 13, FontWeights.Bold)).Margin(0, 0, 0, 12),
+            Label("Top memory"), list.Margin(0, 6, 0, 0),
             PillButton("Task Manager", WinActions.OpenTaskManager).Margin(0, 6, 0, 0));
     }
 }
@@ -125,10 +126,10 @@ public sealed class NetworkWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _down = Text("", 13, FontWeights.Bold);
-        _up = Text("", 10.5, FontWeights.SemiBold, "Text.Secondary");
-        _line = new Sparkline("Accent") { Width = 60, Height = 26, Margin = new Thickness(12, 0, 2, 0) };
-        return H(V(H(Icon(Glyphs.Download, 10, "Accent").Margin(0, 0, 4, 0), _down), H(Icon(Glyphs.Upload, 9, "Text.Secondary").Margin(0, 0, 4, 0), _up)).Margin(2, 0, 0, 0), _line);
+        _down = Text("", 11, FontWeights.Bold);
+        _up = Text("", 8.5, FontWeights.SemiBold, "Text.Secondary");
+        _line = new Sparkline("Accent") { Width = 52, Height = 20, Margin = new Thickness(10, 0, 0, 0) };
+        return H(V(H(Icon(Glyphs.Download, 8.5, "Accent").Margin(0, 0, 3, 0), _down), H(Icon(Glyphs.Upload, 7.5, "Text.Secondary").Margin(0, 0, 3, 0), _up)).Margin(1, 0, 0, 0), _line);
     }
 
     protected override void OnAttach() => Svc.Sys.Updated += Render;
@@ -146,18 +147,26 @@ public sealed class NetworkWidget : WidgetBase
 /// <summary>The blue battery tile: lightning + percent on an accent gradient.</summary>
 public sealed class BatteryWidget : WidgetBase
 {
-    TextBlock _pct = null!, _bolt = null!;
+    static readonly Brush BlueFill = Gradient("#46ACFF", "#0A72FF"), RedFill = Gradient("#FF6B60", "#E0281D");
+    TextBlock _pct = null!;
+    FrameworkElement _bolt = null!;
     protected override int TickSeconds => 15;
     protected override Brush? TileFill => _fill;
-    Brush _fill = Gradient("#4AA8FF", "#0A6CFF");
+    Brush _fill = BlueFill;
 
     protected override UIElement BuildContent()
     {
-        Tile.Width = 50;
+        Tile.Width = TileHeight;
         Tile.Padding = new Thickness(0);
-        _bolt = Text("⚡", 12, FontWeights.Bold, "OnAccent");
-        _pct = Text("", 15, FontWeights.Bold, "OnAccent");
-        return H(_bolt, _pct).Center();
+        Tile.BorderThickness = new Thickness(0);
+        _bolt = new BoltMark { Width = 6, Height = 9, Margin = new Thickness(0, 0, 2.5, 0) };
+        _pct = Text("", 11.5, FontWeights.Bold, "OnAccent");
+        var g = new Grid();
+        // A few faint sparkles, like the reference tile.
+        foreach (var (x, y, d) in new[] { (7.0, 6.0, 2.0), (31.0, 5.0, 1.6), (35.0, 9.5, 1.3), (20.0, 35.0, 1.6), (9.0, 31.0, 1.2) })
+            g.Children.Add(new System.Windows.Shapes.Ellipse { Width = d, Height = d, Fill = Brushes.White, Opacity = 0.55, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(x, y, 0, 0), IsHitTestVisible = false });
+        g.Children.Add(H(_bolt, _pct).Center());
+        return g;
     }
 
     protected override void OnTick(DateTime now)
@@ -166,8 +175,9 @@ public sealed class BatteryWidget : WidgetBase
         s.SampleBattery();
         _pct.Text = s.HasBattery ? s.BatteryPercent.ToString() : "AC";
         _bolt.Visibility = s.OnAc ? Visibility.Visible : Visibility.Collapsed;
-        var fill = !s.HasBattery || s.BatteryPercent > 20 || s.OnAc ? Gradient("#4AA8FF", "#0A6CFF") : Gradient("#FF6B60", "#E0281D");
+        var fill = !s.HasBattery || s.BatteryPercent > 20 || s.OnAc ? BlueFill : RedFill;
         if (!ReferenceEquals(fill, _fill)) { _fill = fill; InvalidateTile(); }
+        ToolTip = s.HasBattery ? $"{s.BatteryPercent}% {(s.OnAc ? "· charging" : "· on battery")}" : "Plugged in";
     }
 
     protected override void OnClick() => WinActions.OpenSettings("batterysaver");
@@ -182,10 +192,10 @@ public sealed class BatteryDotsWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        var grid = new UniformGrid { Rows = 3, Columns = 10, Width = 92, Height = 27 };
-        for (int i = 0; i < 30; i++) { _dots[i] = new Ellipse { Width = 7.5, Height = 7.5 }; grid.Children.Add(_dots[i]); }
-        _date = Text("", 8.5, FontWeights.SemiBold, "Text.Secondary");
-        _pct = Text("", 8.5, FontWeights.Bold);
+        var grid = new UniformGrid { Rows = 3, Columns = 10, Width = 86, Height = 24 };
+        for (int i = 0; i < 30; i++) { _dots[i] = new Ellipse { Width = 6.4, Height = 6.4 }; grid.Children.Add(_dots[i]); }
+        _date = Text("", 6.5, FontWeights.SemiBold, "Text.Secondary");
+        _pct = Text("", 7, FontWeights.Bold);
         return V(grid, Columns("*,auto", _date, _pct).Margin(0, 1, 0, 0));
     }
 
@@ -243,21 +253,25 @@ public sealed class QuickTogglesWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        (_wifi, _wifiIcon) = Pill(Glyphs.Wifi, () => _ = Svc.Radios.ToggleAsync(RadioKind.WiFi), () => WinActions.OpenSettings("network-wifi"));
-        (_bt, _btIcon) = Pill(Glyphs.Bluetooth, () => _ = Svc.Radios.ToggleAsync(RadioKind.Bluetooth), () => WinActions.OpenSettings("bluetooth"));
+        (_wifi, _wifiIcon) = Pill(Glyphs.Wifi, () => _ = Svc.Radios.ToggleAsync(RadioKind.WiFi), p => FlyoutWindow.Toggle(p, WifiCard.Build(), 340));
+        _wifi.ToolTip = "Wi-Fi — click the arrow for networks";
+        (_bt, _btIcon) = Pill(Glyphs.Bluetooth, () => _ = Svc.Radios.ToggleAsync(RadioKind.Bluetooth), p => FlyoutWindow.Toggle(p, BluetoothCard.Build(), 340));
+        _bt.ToolTip = "Bluetooth — click the arrow for devices";
         _bt.Margin = new Thickness(6, 0, 0, 0);
         return H(_wifi, _bt);
     }
 
-    static (Border, TextBlock) Pill(string glyph, Action toggle, Action more)
+    static (Border, TextBlock) Pill(string glyph, Action toggle, Action<FrameworkElement> more)
     {
-        var icon = Icon(glyph, 14);
-        var left = new Border { Width = 36, Height = 34, Background = Brushes.Transparent, Child = icon, Cursor = System.Windows.Input.Cursors.Hand };
+        var icon = Icon(glyph, 11);
+        var left = new Border { Width = 30, Height = 30, Background = Brushes.Transparent, Child = icon, Cursor = System.Windows.Input.Cursors.Hand };
         left.MouseLeftButtonUp += (_, e) => { e.Handled = true; toggle(); };
-        var divider = new Border { Width = 1, Height = 16 }.Bg("Divider");
-        var chev = new Border { Width = 30, Height = 34, Background = Brushes.Transparent, Child = Icon(Glyphs.ChevronRight, 10), Cursor = System.Windows.Input.Cursors.Hand };
-        chev.MouseLeftButtonUp += (_, e) => { e.Handled = true; more(); };
-        var pill = new Border { CornerRadius = new CornerRadius(17), BorderThickness = new Thickness(1.5), Child = H(left, divider, chev), Height = 36 };
+        var divider = new Border { Width = 1, Height = 12 }.Bg("Divider");
+        var chev = new Border { Width = 25, Height = 30, Background = Brushes.Transparent, Child = Icon(Glyphs.ChevronRight, 8.5), Cursor = System.Windows.Input.Cursors.Hand };
+        Border? pillRef = null;
+        chev.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (pillRef != null) more(pillRef); };
+        var pill = new Border { CornerRadius = new CornerRadius(15), BorderThickness = new Thickness(1.25), Child = H(left, divider, chev), Height = 30 };
+        pillRef = pill;
         return (pill, icon);
     }
 
@@ -306,15 +320,15 @@ public sealed class BrightnessWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _pct = Text("", 11, FontWeights.SemiBold, "Text.Secondary");
+        _pct = Text("", 8, FontWeights.SemiBold, "Text.Secondary");
         _slider = Slider(50, v =>
         {
             _pct.Text = $"{v:0}%";
             if (!_syncing) Svc.Brightness.Set((int)v);
         });
-        _slider.Width = 140;
-        var head = Columns("auto,*,auto", Icon(Glyphs.Brightness, 12, "Text.Secondary").Margin(0, 0, 5, 0), Caption("Brightness", "Text.Primary"), _pct);
-        return V(head, _slider.Margin(0, 3, 0, 0));
+        _slider.Width = 138;
+        var head = Columns("auto,*,auto", Icon(Glyphs.Brightness, 9, "Text.Secondary").Margin(0, 0, 4, 0), Text("Brightness", 9, FontWeights.Bold), _pct);
+        return V(head, _slider.Margin(0, 4, 0, 0));
     }
 
     protected override async void OnTick(DateTime now)
@@ -337,7 +351,7 @@ public sealed class ActionWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        Tile.Width = 48;
+        Tile.Width = TileHeight;
         Tile.Padding = new Thickness(0);
         var glyph = _kind switch
         {
@@ -347,7 +361,7 @@ public sealed class ActionWidget : WidgetBase
             _ => Glyphs.Chart,
         };
         ToolTip = _kind switch { Kind.Theme => "Light / dark mode", Kind.Notifications => "Notifications", Kind.ShowDesktop => "Show desktop", _ => "Task Manager" };
-        return Icon(glyph, 17);
+        return Icon(glyph, 14);
     }
 
     protected override void OnClick()
@@ -371,10 +385,10 @@ public sealed class StorageWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _free = Text("", 13, FontWeights.Bold);
-        var bar = Progress(out _set, "Accent", 5);
-        bar.Width = 90;
-        return H(Icon(Glyphs.Storage, 18, "Text.Secondary").Margin(0, 0, 10, 0), V(_free, bar.Margin(0, 6, 0, 0)));
+        _free = Text("", 10.5, FontWeights.Bold);
+        var bar = Progress(out _set, "Accent", 4);
+        bar.Width = 80;
+        return H(Icon(Glyphs.Storage, 14, "Text.Secondary").Margin(0, 0, 8, 0), V(_free, bar.Margin(0, 5, 0, 0)));
     }
 
     protected override void OnTick(DateTime now)
@@ -410,8 +424,8 @@ public sealed class RecycleBinWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _count = Text("", 11, FontWeights.SemiBold, "Text.Secondary");
-        return H(Icon(Glyphs.Recycle, 18).Margin(0, 0, 8, 0), V(Text("Bin", 12.5, FontWeights.Bold), _count));
+        _count = Text("", 8.5, FontWeights.SemiBold, "Text.Secondary");
+        return H(Icon(Glyphs.Recycle, 14).Margin(0, 0, 7, 0), V(Text("Bin", 10.5, FontWeights.Bold), _count));
     }
 
     protected override void OnTick(DateTime now)
@@ -426,5 +440,161 @@ public sealed class RecycleBinWidget : WidgetBase
     {
         menu.Items.Add(Item("Open", () => WindowTracker.Launch("shell:RecycleBinFolder")));
         menu.Items.Add(Item("Empty Recycle Bin…", () => { WinActions.EmptyRecycleBin(); OnTick(DateTime.Now); }));
+    }
+}
+
+/// <summary>Control Centre button: opens the quick-settings card (Wi-Fi, Bluetooth, airplane, dark mode, sliders…).</summary>
+public sealed class ControlCenterWidget : WidgetBase
+{
+    protected override UIElement BuildContent()
+    {
+        Tile.Width = TileHeight;
+        Tile.Padding = new Thickness(0);
+        ToolTip = "Control Centre";
+        return new ToggleMark { Width = 18, Height = 16 };
+    }
+
+    protected override double CardWidth => 360;
+    protected override UIElement BuildCard() => ControlCenter.Build();
+
+    /// <summary>Two little switches, the usual "control centre" symbol.</summary>
+    sealed class ToggleMark : FrameworkElement
+    {
+        protected override void OnRender(DrawingContext dc)
+        {
+            var b = Res("Text.Primary");
+            double w = ActualWidth, h = ActualHeight, ph = h * 0.42, r = ph / 2;
+            var pen = new Pen(b, 1.3);
+            dc.DrawRoundedRectangle(null, pen, new Rect(0.65, 0.65, w - 1.3, ph - 1.3), r - 0.65, r - 0.65);
+            dc.DrawEllipse(b, null, new Point(w - r, r), r - 2.2, r - 2.2);
+            double y2 = h - ph;
+            dc.DrawRoundedRectangle(b, null, new Rect(0, y2, w, ph), r, r);
+            dc.DrawEllipse(Res("Tile.Background") is SolidColorBrush s && s.Color.A > 0x80 ? s : Brushes.Black, null, new Point(r, y2 + r), r - 2.2, r - 2.2);
+        }
+    }
+}
+
+/// <summary>
+/// System metrics at a glance: CPU, GPU, RAM and network as labelled mini bars (the AI-limits tile layout).
+/// Card: live charts, memory, VRAM, and the top processes by CPU and by memory.
+/// </summary>
+public sealed class SystemMonitorWidget : WidgetBase
+{
+    readonly Action<double>[] _bars = new Action<double>[3];
+    readonly TextBlock[] _vals = new TextBlock[3];
+    TextBlock _net = null!;
+
+    protected override UIElement BuildContent()
+    {
+        var grid = new Grid { VerticalAlignment = VerticalAlignment.Center };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+        string[] names = { "CPU", "GPU", "RAM" };
+        for (int r = 0; r < 3; r++)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(11.5) });
+            grid.Children.Add(Text(names[r], 7.5, FontWeights.Bold, "Text.Secondary").Row(r));
+            var bar = Progress(out _bars[r], "Accent", 3).Row(r).Col(1);
+            bar.Margin = new Thickness(0, 0, 4, 0);
+            grid.Children.Add(bar);
+            _vals[r] = Text("—", 8.5, FontWeights.Bold).Row(r).Col(2).Right();
+            grid.Children.Add(_vals[r]);
+        }
+        _net = Text("", 7.5, FontWeights.SemiBold, "Text.Secondary");
+        var net = V(Icon(Glyphs.Download, 9, "Accent"), _net.Center());
+        net.Margin = new Thickness(10, 0, 0, 0);
+        net.MinWidth = 40;
+        return H(grid, net);
+    }
+
+    protected override void OnAttach() { Svc.Sys.Updated += Render; Svc.Gpu.Updated += Render; }
+    protected override void OnDetach() { Svc.Sys.Updated -= Render; Svc.Gpu.Updated -= Render; }
+
+    void Render()
+    {
+        var s = Svc.Sys;
+        var g = Svc.Gpu;
+        Set(0, s.Cpu);
+        Set(1, g.Load);
+        Set(2, s.Ram);
+        _net.Text = Fmt.Rate(s.NetDown);
+    }
+
+    void Set(int i, double v)
+    {
+        _bars[i](Math.Max(0, v) / 100);
+        _vals[i].Text = v < 0 ? "—" : $"{v:0}%";
+    }
+
+    protected override double CardWidth => 380;
+    protected override UIElement BuildCard()
+    {
+        var s = Svc.Sys;
+        var g = Svc.Gpu;
+        Sparkline Chart(IEnumerable<double> values, string brush, double? max = 100)
+        {
+            var c = new Sparkline(brush) { Height = 34, Max = max, Margin = new Thickness(0, 4, 0, 10) };
+            c.SetValues(values);
+            return c;
+        }
+        var cpuV = Text($"{s.Cpu:0}%", 13, FontWeights.Bold);
+        var gpuV = Text(g.Load < 0 ? "—" : $"{g.Load:0}%", 13, FontWeights.Bold);
+        var ramV = Text($"{s.RamUsedGb:0.0} / {s.RamTotalGb:0} GB", 13, FontWeights.Bold);
+        var netV = Text($"↓ {Fmt.Rate(s.NetDown)}   ↑ {Fmt.Rate(s.NetUp)}", 13, FontWeights.Bold);
+        var cpuC = Chart(s.CpuHistory, "Accent");
+        var gpuC = Chart(g.History, "Sys.Purple");
+        var ramC = Chart(s.RamHistory, "Sys.Green");
+        var netC = Chart(s.NetHistory, "Sys.Orange", null);
+        void Live()
+        {
+            cpuV.Text = $"{s.Cpu:0}%"; gpuV.Text = g.Load < 0 ? "—" : $"{g.Load:0}%";
+            ramV.Text = $"{s.RamUsedGb:0.0} / {s.RamTotalGb:0} GB{(g.VramGb >= 0 ? $"  ·  VRAM {g.VramGb:0.0} GB" : "")}";
+            netV.Text = $"↓ {Fmt.Rate(s.NetDown)}   ↑ {Fmt.Rate(s.NetUp)}";
+            cpuC.SetValues(s.CpuHistory); gpuC.SetValues(g.History); ramC.SetValues(s.RamHistory); netC.SetValues(s.NetHistory);
+        }
+        var top = new StackPanel();
+        top.Children.Add(Text("Measuring…", 12, null, "Text.Secondary"));
+        var root = V(Card.Header("System"),
+            Columns("*,auto", Label("Processor"), cpuV), cpuC,
+            Columns("*,auto", Label("Graphics"), gpuV), gpuC,
+            Columns("*,auto", Label("Memory"), ramV), ramC,
+            Columns("*,auto", Label("Network"), netV), netC,
+            Label("Top processes (CPU · memory)").Margin(0, 2, 0, 8), top,
+            PillButton("Task Manager", WinActions.OpenTaskManager).Margin(0, 8, 0, 0));
+        root.Loaded += async (_, _) =>
+        {
+            s.Updated += Live; g.Updated += Live;
+            var procs = await Task.Run(TopProcesses);
+            top.Children.Clear();
+            foreach (var p in procs)
+                top.Children.Add(Columns("*,52,64", Text(p.name, 12.5, FontWeights.SemiBold), Text($"{p.cpu:0.0}%", 12, null, "Text.Secondary").Right(),
+                    Text(Fmt.Bytes(p.mem), 12, null, "Text.Secondary").Right()).Margin(0, 0, 0, 6));
+        };
+        root.Unloaded += (_, _) => { s.Updated -= Live; g.Updated -= Live; };
+        return root;
+    }
+
+    /// <summary>Two snapshots of process CPU time one second apart → per-app CPU % (all cores = 100 %).</summary>
+    static List<(string name, double cpu, long mem)> TopProcesses()
+    {
+        static Dictionary<int, (string name, TimeSpan cpu, long mem)> Snap()
+        {
+            var d = new Dictionary<int, (string, TimeSpan, long)>();
+            foreach (var p in Process.GetProcesses())
+            {
+                try { d[p.Id] = (p.ProcessName, p.TotalProcessorTime, p.WorkingSet64); } catch { }
+                finally { p.Dispose(); }
+            }
+            return d;
+        }
+        var a = Snap();
+        var t0 = DateTime.UtcNow;
+        Thread.Sleep(1000);
+        var b = Snap();
+        double wall = (DateTime.UtcNow - t0).TotalMilliseconds * Environment.ProcessorCount;
+        return b.Select(kv => (kv.Value.name, cpu: a.TryGetValue(kv.Key, out var o) ? (kv.Value.cpu - o.cpu).TotalMilliseconds / wall * 100 : 0, kv.Value.mem))
+            .GroupBy(x => x.name).Select(gr => (name: gr.Key, cpu: gr.Sum(x => x.cpu), mem: gr.Sum(x => x.mem)))
+            .Where(x => x.name != "Idle").OrderByDescending(x => x.cpu).ThenByDescending(x => x.mem).Take(6).ToList();
     }
 }

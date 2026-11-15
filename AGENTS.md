@@ -93,10 +93,16 @@ reference/lumabar/       original app's public README + screenshots (reference o
 
 ## Known gotchas (learned the hard way)
 
-- **Rendering:** windows are *layered* (`AllowsTransparency=true`) + a rounded `SetWindowRgn`. The
-  non-layered "WindowChrome glass" path renders **black** once a region is set. DWM blur/acrylic is
-  **off** because on layered windows it ignores the region and fills the whole rectangle. The dock's
-  glass is a pre-blurred wallpaper slice (`Theming/WallpaperGlass.cs`). Details in ARCHITECTURE.md.
+- **Rendering:** windows are *layered* (`AllowsTransparency=true`) with **no** Win32 region (aliased corners);
+  shapes are anti-aliased geometry clips. The non-layered "WindowChrome glass" path renders **black** with a
+  region. DWM blur/acrylic is **off** (on layered windows it fills the whole rectangle). The dock's glass is a
+  pre-blurred wallpaper slice (`Theming/WallpaperGlass.cs`). Cards/panels are opaque. Details in ARCHITECTURE.md.
+- **Several displays:** `DockWindow.All` holds one dock per display; only `DockWindow.Instance` (primary) owns
+  the taskbar, shell hook and windows. Use `DockWindow.For(element)` to reach the dock a widget lives in.
+  Layout edits must go through `SaveWidgets()` so the other docks rebuild.
+- **Line endings / glyphs:** sources are LF in git (autocrlf on). Multi-line `perl -0pi` edits silently miss on
+  CRLF files: normalise with `sed -i 's/$//'` first. Writing `"E701"` through some tools stores the raw
+  PUA character; both compile, but grep for the glyph name, not the escape.
 - WPF SDK drops `System.IO` from implicit usings; it's re-added in `GlobalUsings.cs`. Files that import
   `System.Windows.Shapes` must write `System.IO.Path` explicitly.
 - `Svc` is a global alias for `Vela.Services.Services`. Inside namespace `Vela.*`, a bare `Services`
@@ -106,7 +112,8 @@ reference/lumabar/       original app's public README + screenshots (reference o
 - `Glyphs` in `UI/UI.cs` contain the raw Private-Use-Area characters (Segoe Fluent Icons / MDL2). Write new
   ones as `""` escapes; some shell tools mangle the raw characters.
 - The computer-use screenshot tool can't target Vela (not a Start-menu app). Use `tools/screenshot.ps1`.
-- The display here is 2560×1600 at 175 %. Always reason in physical px for Win32, DIPs for WPF.
+- The owner's main display is 2560×1600 at 175 % plus a 1920×1080 display at 100 % on the left (negative X).
+  Always reason in physical px for Win32, DIPs for WPF. `tools/screenshot.ps1` only captures the primary.
 
 ## Handoff protocol (Claude ⇄ Codex)
 

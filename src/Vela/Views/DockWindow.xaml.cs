@@ -19,7 +19,20 @@ namespace Vela.Views;
 /// </summary>
 public partial class DockWindow : GlassWindow
 {
+    /// <summary>The dock on the primary display (owns the taskbar, shell hook and windows).</summary>
     public static DockWindow? Instance { get; private set; }
+    /// <summary>Every dock: the primary plus one per extra display when Settings.Displays == "all".</summary>
+    public static readonly List<DockWindow> All = new();
+    /// <summary>The dock that contains <paramref name="d"/> (falls back to the primary dock).</summary>
+    public static DockWindow? For(DependencyObject? d) => (d != null ? Window.GetWindow(d) as DockWindow : null) ?? Instance;
+
+    /// <summary>Monitor device name (e.g. \.DISPLAY2) for secondary docks; null = primary display.</summary>
+    readonly string? _device;
+    public bool IsPrimary => _device == null;
+    /// <summary>The dock whose edit triggered a "widgets" save (it doesn't need to rebuild itself).</summary>
+    static DockWindow? _origin;
+    /// <summary>The visible bar (cards anchor to its edge).</summary>
+    public FrameworkElement BarElement => Bar;
 
     /// <summary>Registered message for `Vela.exe --widgets / --settings` (wParam 1 / 2).</summary>
     public static readonly uint CommandMessage = RegisterWindowMessage("Vela.Command");
@@ -39,14 +52,21 @@ public partial class DockWindow : GlassWindow
 
     public event Action? WidgetsChanged;
 
-    public DockWindow()
+    /// <summary>Bar geometry (DIPs at size M): padding around the tiles and the outer corner radius.</summary>
+    public const double BarPadding = 3, BarRadius = 16;
+    /// <summary>Gap between the top of the bar and the reserved work area (room for the bar's shadow).</summary>
+    const double TopGap = 4;
+
+    public DockWindow(string? device = null)
     {
         InitializeComponent();
-        Instance = this;
+        _device = device;
+        if (device == null) Instance = this; else Title = "Vela Dock (" + device.TrimStart('\\', '.') + ")";
+        All.Add(this);
         NoActivate = true;
         RegionElement = Bar;
-        RegionRadius = 20;
-        Bar.LayoutTransform = _sizeScale;
+        RegionRadius = BarRadius;
+        BarHost.LayoutTransform = _sizeScale;
         Left = -32000; Top = -32000; Width = 100; Height = 60;
 
         ThemeManager.Changed += ApplyLook;
@@ -61,13 +81,84 @@ public partial class DockWindow : GlassWindow
             if (e.OriginalSource is DependencyObject d && FindWidget(d) != null) return; // widget menus handle themselves
             Bar.ContextMenu = BuildBarMenu();
         };
-        Closed += (_, _) => Application.Current.Shutdown();
+        Closed += (_, _) =>
+        {
+            All.Remove(this);
+            ThemeManager.Changed -= ApplyLook;
+            Settings.Changed -= OnSettingChanged;
+            WallpaperGlass.Changed -= UpdateGlass;
+            if (IsPrimary) Application.Current.Shutdown();
+        };
         Bar.MouseLeftButtonDown += OnBarMouseDown;
         Bar.MouseMove += OnBarMouseMove;
         Bar.MouseLeftButtonUp += OnBarMouseUp;
         Items.PreviewMouseLeftButtonDown += OnItemsPreviewDown;
         Items.PreviewMouseMove += OnItemsPreviewMove;
         Items.PreviewMouseLeftButtonUp += OnItemsPreviewUp;
+        SetupDesktopCorner();
+        Items.NaturalWidthChanged += FitItems;
+        SizeChanged += (_, _) => FitItems();
+    }
+
+    /// <summary>
+    /// Dynamic fit: if the widgets need more width than the screen offers (small display, size L, many
+    /// widgets), scale the row down uniformly (to 60 % at most) instead of clipping; back to 100 % when it fits.
+    /// </summary>
+    void FitItems()
+    {
+        if (!IsLoaded || Items.NaturalWidth <= 0 || ActualWidth < 400) return; // not positioned yet
+        double scale = ThemeManager.SizeScale;
+        double side = BarHost.Margin.Left + BarHost.Margin.Right;
+        double corner = DesktopCorner.Visibility == Visibility.Visible ? DesktopCorner.Width + DesktopCorner.Margin.Left + DesktopCorner.Margin.Right : 0;
+        double avail = (ActualWidth - side) / scale - 2 * BarPadding - 2 - corner - Items.Margin.Left - Items.Margin.Right;
+        double f = Items.NaturalWidth > avail ? Math.Max(0.6, avail / Items.NaturalWidth) : 1;
+        double cur = Items.LayoutTransform is ScaleTransform st ? st.ScaleX : 1;
+        if (Math.Abs(f - cur) < 0.005) return;
+        Items.LayoutTransform = f >= 0.999 ? Transform.Identity : new ScaleTransform(f, f);
+        if (f < 1) Log.Info($"Dock content scaled to {f:P0} to fit the screen");
+    }
+
+    // ------------------------------------------------------------------ peek / show desktop corner
+
+    System.Windows.Threading.DispatcherTimer? _peekTimer;
+    bool _peeking;
+
+    void SetupDesktopCorner()
+    {
+        DesktopCorner.MouseEnter += (_, _) =>
+        {
+            _peekTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(550) };
+            _peekTimer.Tick -= OnPeekTimer;
+            _peekTimer.Tick += OnPeekTimer;
+            _peekTimer.Start();
+            DesktopCorner.Background = (Brush)FindResource("Tile.Hover");
+        };
+        DesktopCorner.MouseLeave += (_, _) => { _peekTimer?.Stop(); EndPeek(); DesktopCorner.Background = Brushes.Transparent; };
+        DesktopCorner.MouseLeftButtonUp += (_, e) => { e.Handled = true; _peekTimer?.Stop(); EndPeek(); WinActions.ShowDesktop(); };
+        DesktopCorner.ContextMenuOpening += (_, e) =>
+        {
+            e.Handled = true;
+            var m = new ContextMenu();
+            m.Items.Add(MI("Show desktop", WinActions.ShowDesktop));
+            m.Items.Add(MI("Hide this corner", () => { Settings.Current.DesktopCorner = false; Settings.Save("dock"); }));
+            m.PlacementTarget = DesktopCorner;
+            m.IsOpen = true;
+        };
+    }
+
+    void OnPeekTimer(object? s, EventArgs e)
+    {
+        _peekTimer?.Stop();
+        if (!DesktopCorner.IsMouseOver) return;
+        _peeking = true;
+        WinActions.Peek(true, Hwnd);
+    }
+
+    void EndPeek()
+    {
+        if (!_peeking) return;
+        _peeking = false;
+        WinActions.Peek(false, Hwnd);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -77,13 +168,48 @@ public partial class DockWindow : GlassWindow
         _appBar = new AppBar(Hwnd);
         _appBar.Register();
         _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
-        Svc.Windows.Start(Hwnd);
         Svc.Windows.ForegroundChanged += CheckFullscreen;
-        Svc.Taskbar.Apply(Settings.Current.TaskbarMode);
-        Svc.Ticker.Tick += OnTick;
+        if (IsPrimary)
+        {
+            Svc.Windows.Start(Hwnd);
+            Svc.Taskbar.Apply(Settings.Current.TaskbarMode);
+            Svc.Ticker.Tick += OnTick;
+        }
 
         BuildWidgets();
         ApplyLook();
+        if (IsPrimary) Dispatcher.BeginInvoke(SyncDisplays, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    }
+
+    // ------------------------------------------------------------------ displays
+
+    /// <summary>This dock's display (falls back to the primary if it was unplugged).</summary>
+    internal MONITORINFO MonitorInfo(out IntPtr hmon)
+    {
+        if (_device != null)
+            foreach (var m in AllMonitors())
+                if (m.Device == _device) { hmon = m.Handle; return m.Info; }
+        return GetPrimaryMonitor(out hmon);
+    }
+
+    /// <summary>Primary dock only: open a dock on every other display (or close them), per Settings.Displays.</summary>
+    public void SyncDisplays()
+    {
+        if (!IsPrimary) return;
+        var want = Settings.Current.Displays == "all"
+            ? AllMonitors().Where(m => !m.Primary).Select(m => m.Device).ToHashSet()
+            : new HashSet<string>();
+        foreach (var d in All.Where(x => !x.IsPrimary && !want.Contains(x._device!)).ToList())
+        {
+            Log.Info("Closing dock on " + d._device);
+            d.Teardown();
+            d.Close();
+        }
+        foreach (var dev in want.Where(dev => All.All(x => x._device != dev)).ToList())
+        {
+            Log.Info("Opening dock on " + dev);
+            try { new DockWindow(dev).Show(); } catch (Exception ex) { Log.Error("Dock on " + dev, ex); }
+        }
     }
 
     // ------------------------------------------------------------------ layout & position
@@ -93,7 +219,9 @@ public partial class DockWindow : GlassWindow
         double s = ThemeManager.SizeScale;
         _sizeScale.ScaleX = _sizeScale.ScaleY = s;
         RegionScale = s;
-        Sheen.Visibility = ThemeManager.Current.Sheen.A > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Sheen.Visibility = ThemeManager.Current.Sheen.A > 0 || ThemeManager.Liquid ? Visibility.Visible : Visibility.Collapsed;
+        Rim.Visibility = ThemeManager.Liquid ? Visibility.Visible : Visibility.Collapsed;
+        DesktopCorner.Visibility = Settings.Current.DesktopCorner ? Visibility.Visible : Visibility.Collapsed;
         ApplySpacing();
         QueueReposition();
         UpdateRegion();
@@ -103,7 +231,7 @@ public partial class DockWindow : GlassWindow
     /// <summary>Line the blurred wallpaper slice up with the bar's current screen position.</summary>
     void UpdateGlass()
     {
-        if (Hwnd == IntPtr.Zero || !Bar.IsLoaded || ThemeManager.Current.Backdrop == BackdropKind.None)
+        if (Hwnd == IntPtr.Zero || !Bar.IsLoaded || !ThemeManager.GlassOn)
         {
             Bar.Background = null;
             return;
@@ -112,7 +240,7 @@ public partial class DockWindow : GlassWindow
         {
             var tl = Bar.PointToScreen(new Point(0, 0));
             var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
-            var m = GetPrimaryMonitor(out _).rcMonitor;
+            var m = MonitorInfo(out _).rcMonitor;
             Bar.Background = WallpaperGlass.BrushFor(new Rect(tl, br), new Rect(m.Left, m.Top, m.Width, m.Height));
         }
         catch (InvalidOperationException) { /* not yet connected to a presentation source */ }
@@ -130,7 +258,10 @@ public partial class DockWindow : GlassWindow
         switch (what)
         {
             case "theme": case "size": case "accent": ThemeManager.Apply(); break;
+            case "glass": WallpaperGlass.Reload(); ThemeManager.Apply(); break;
             case "dock": ApplyLook(); break;
+            case "widgets": if (_origin != this && _origin != null || _origin == null && !IsPrimary) BuildWidgets(); break;
+            case "displays": SyncDisplays(); break;
             case "taskbar": Svc.Taskbar.Apply(Settings.Current.TaskbarMode); QueueReposition(); break;
         }
     }
@@ -145,24 +276,34 @@ public partial class DockWindow : GlassWindow
     void Reposition()
     {
         if (Hwnd == IntPtr.Zero || _appBar == null) return;
-        var mi = GetPrimaryMonitor(out var hmon);
+        var mi = MonitorInfo(out var hmon);
         double dpi = GetMonitorScale(hmon);
-        bool top = Settings.Current.Edge == "top";
-        double margin = Settings.Current.EdgeMargin;
-        double barH = (WidgetBase.TileHeight + 12) * ThemeManager.SizeScale;   // tile + padding + border
-        int hPx = (int)Math.Ceiling((barH + margin + 4) * dpi);
+        var s = Settings.Current;
+        bool top = s.Edge == "top";
+        double margin = Math.Max(0, s.EdgeMargin);
+        double hairline = 1 / dpi;
+        double barH = (WidgetBase.TileHeight + 2 * BarPadding) * ThemeManager.SizeScale + 2 * hairline;
+        int hPx = (int)Math.Ceiling((barH + margin + TopGap) * dpi);
 
         var rect = mi.rcMonitor;
         if (top) rect.Bottom = rect.Top + hPx; else rect.Top = rect.Bottom - hPx;
-        if (Settings.Current.ReserveSpace) rect = _appBar.Reserve(mi.rcMonitor, top, hPx);
+        if (s.ReserveSpace) rect = _appBar.Reserve(mi.rcMonitor, top, hPx);
         else _appBar.Release(mi.rcMonitor, top);
 
-        Bar.VerticalAlignment = top ? VerticalAlignment.Top : VerticalAlignment.Bottom;
-        Bar.Margin = top ? new Thickness(0, margin, 0, 0) : new Thickness(0, 0, 0, margin);
+        // Full width: the bar runs edge to edge with the same small inset on the sides as from the screen edge.
+        bool full = s.BarWidth != "fit";
+        double side = full ? Math.Max(4, margin) : 0;
+        BarHost.HorizontalAlignment = full ? HorizontalAlignment.Stretch : HorizontalAlignment.Center;
+        BarHost.VerticalAlignment = top ? VerticalAlignment.Top : VerticalAlignment.Bottom;
+        BarHost.Margin = top ? new Thickness(side, margin, side, 0) : new Thickness(side, 0, side, margin);
+        Shadow.Margin = top ? new Thickness(1, -1, 1, 1) : new Thickness(1, 1, 1, -1);
         SetWindowPos(Hwnd, HWND_TOPMOST, mi.rcMonitor.Left, top ? mi.rcMonitor.Top : mi.rcMonitor.Bottom - hPx,
             mi.rcMonitor.Width, hPx, SWP_NOACTIVATE);
         UpdateRegion();
         Dispatcher.BeginInvoke(UpdateGlass, System.Windows.Threading.DispatcherPriority.Loaded);
+        // Windows that were maximized while the taskbar was hidden still cover the whole screen; fit them
+        // to the new work area so the dock never sits on top of an app's own UI.
+        if (s.ReserveSpace) Dispatcher.BeginInvoke(() => WindowTracker.FitMaximizedToWorkArea(Hwnd), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     // ------------------------------------------------------------------ widgets
@@ -209,7 +350,7 @@ public partial class DockWindow : GlassWindow
         AddControl(inst);
         EnsurePlaceholder();
         ApplySpacing();
-        Settings.Save("widgets");
+        SaveWidgets();
         WidgetsChanged?.Invoke();
     }
 
@@ -226,14 +367,93 @@ public partial class DockWindow : GlassWindow
         w.Dispose();
         Settings.Current.Widgets.Remove(w.Instance);
         EnsurePlaceholder();
-        Settings.Save("widgets");
+        SaveWidgets();
         WidgetsChanged?.Invoke();
+    }
+
+    /// <summary>Control-panel helpers: move / remove a widget by its instance.</summary>
+    public void MoveWidget(WidgetInstance inst, int delta)
+    {
+        var w = Items.Children.OfType<WidgetBase>().FirstOrDefault(x => x.Instance == inst);
+        if (w == null) return;
+        int i = Items.Children.IndexOf(w), j = Math.Clamp(i + delta, 0, Items.Children.Count - 1);
+        if (i == j) return;
+        Items.Children.RemoveAt(i);
+        Items.Children.Insert(j, w);
+        PersistOrder();
+    }
+
+    public void RemoveInstance(WidgetInstance inst)
+    {
+        var w = Items.Children.OfType<WidgetBase>().FirstOrDefault(x => x.Instance == inst);
+        if (w != null) RemoveWidget(w);
+    }
+
+    // ------------------------------------------------------------------ stacks
+
+    /// <summary>Merge a widget with the one to its right into a stack (or add it to that stack).</summary>
+    public void StackWithNext(WidgetBase w)
+    {
+        int i = Items.Children.IndexOf(w);
+        if (i < 0 || i + 1 >= Items.Children.Count || Items.Children[i + 1] is not WidgetBase next) return;
+        if (next is StackWidget existing)
+        {
+            Items.Children.Remove(w);
+            Settings.Current.Widgets.Remove(w.Instance);
+            w.Dispose();
+            existing.Append(w.Instance);
+            SaveWidgets();
+            return;
+        }
+        var items = new List<WidgetInstance> { w.Instance, next.Instance };
+        if (w is StackWidget s) { items = s.Children_; items.Add(next.Instance); }
+        var inst = new WidgetInstance { Type = "stack" };
+        inst.Config["items"] = System.Text.Json.JsonSerializer.Serialize(items, Json.Options);
+        ReplaceWidgets(i, 2, new[] { inst });
+    }
+
+    /// <summary>Put a stack's widgets back on the dock side by side.</summary>
+    public void Unstack(StackWidget s)
+    {
+        int i = Items.Children.IndexOf(s);
+        if (i < 0) return;
+        ReplaceWidgets(i, 1, s.Children_);
+    }
+
+    void ReplaceWidgets(int index, int count, IEnumerable<WidgetInstance> with)
+    {
+        FlyoutWindow.CloseCurrent();
+        for (int k = 0; k < count; k++)
+        {
+            var old = (WidgetBase)Items.Children[index];
+            Items.Children.RemoveAt(index);
+            Settings.Current.Widgets.Remove(old.Instance);
+            old.Dispose();
+        }
+        int at = index;
+        foreach (var inst in with)
+        {
+            var w = WidgetRegistry.Create(inst);
+            if (w == null) continue;
+            w.RemoveRequested += RemoveWidget;
+            Items.Children.Insert(at++, w);
+        }
+        ApplySpacing();
+        PersistOrder();
+        WidgetsChanged?.Invoke();
+    }
+
+    /// <summary>Save the layout; other docks (other displays) rebuild from it.</summary>
+    void SaveWidgets()
+    {
+        _origin = this;
+        try { Settings.Save("widgets"); } finally { _origin = null; }
     }
 
     void PersistOrder()
     {
         Settings.Current.Widgets = Items.Children.OfType<WidgetBase>().Select(w => w.Instance).ToList();
-        Settings.Save("widgets");
+        SaveWidgets();
     }
 
     static WidgetBase? FindWidget(DependencyObject? d)
@@ -244,32 +464,65 @@ public partial class DockWindow : GlassWindow
 
     // ------------------------------------------------------------------ reorder (edit mode only)
 
+    // Drag any widget sideways to move it (always, not only while the picker is open). A press only
+    // becomes a drag after the pointer travels a few DIPs, so clicks still work; sliders, text boxes
+    // and app icons (which reorder inside the apps strip) are excluded.
+    WidgetBase? _pressCandidate;
+    bool _reordering;
+    const double DragThreshold = 7;
+
+    static bool IsInteractive(DependencyObject? d)
+    {
+        while (d != null && d is not WidgetBase)
+        {
+            if (d is System.Windows.Controls.Primitives.Thumb or Slider or System.Windows.Controls.Primitives.TextBoxBase or PasswordBox
+                or System.Windows.Controls.Primitives.ScrollBar or AppItem) return true;
+            d = VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d);
+        }
+        return false;
+    }
+
     void OnItemsPreviewDown(object sender, MouseButtonEventArgs e)
     {
-        if (!WidgetBase.EditMode) return;
         var w = FindWidget(e.OriginalSource as DependencyObject);
         if (w == null || w.Parent != Items) return;
-        _reorderItem = w;
+        bool interactive = IsInteractive(e.OriginalSource as DependencyObject);
+        if (interactive && !(WidgetBase.EditMode && e.OriginalSource is not (System.Windows.Controls.Primitives.Thumb or Slider))) return;
+        _pressCandidate = w;
         _dragStart = e.GetPosition(Items);
+        if (WidgetBase.EditMode) { BeginReorder(); e.Handled = true; }
+    }
+
+    void BeginReorder()
+    {
+        if (_pressCandidate == null) return;
+        _reorderItem = _pressCandidate;
+        _reordering = true;
+        _reorderItem.Opacity = 0.8;
+        Panel.SetZIndex(_reorderItem, 10);
+        FlyoutWindow.CloseCurrent();
         Items.CaptureMouse();
-        e.Handled = true;
     }
 
     void OnItemsPreviewMove(object sender, MouseEventArgs e)
     {
+        if (!_reordering && _pressCandidate != null && e.LeftButton == MouseButtonState.Pressed)
+        {
+            var q = e.GetPosition(Items);
+            if (Math.Abs(q.X - _dragStart.X) > DragThreshold) BeginReorder();
+        }
         if (_reorderItem == null) return;
         var p = e.GetPosition(Items);
         int from = Items.Children.IndexOf(_reorderItem);
-        int target = from;
-        double x = 0;
-        for (int i = 0; i < Items.Children.Count; i++)
+        // New index = how many other items have their centre left of the pointer. Uses real positions,
+        // because DockRow spreads items across a full-width bar.
+        int target = 0;
+        foreach (FrameworkElement c in Items.Children)
         {
-            var c = (FrameworkElement)Items.Children[i];
-            double mid = x + c.ActualWidth / 2;
-            if (p.X > mid) target = i;
-            x += c.ActualWidth + c.Margin.Left + c.Margin.Right;
+            if (c == _reorderItem) continue;
+            double mid = c.TranslatePoint(new Point(c.ActualWidth / 2, 0), Items).X;
+            if (p.X > mid) target++;
         }
-        if (p.X < ((FrameworkElement)Items.Children[0]).ActualWidth / 2) target = 0;
         if (target != from)
         {
             Items.Children.RemoveAt(from);
@@ -279,9 +532,13 @@ public partial class DockWindow : GlassWindow
 
     void OnItemsPreviewUp(object sender, MouseButtonEventArgs e)
     {
+        _pressCandidate = null;
         if (_reorderItem == null) return;
         Items.ReleaseMouseCapture();
+        _reorderItem.Opacity = 1;
+        Panel.SetZIndex(_reorderItem, 0);
         _reorderItem = null;
+        _reordering = false;
         PersistOrder();
         e.Handled = true;
     }
@@ -291,7 +548,7 @@ public partial class DockWindow : GlassWindow
     void OnBarMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (WidgetBase.EditMode || FindWidget(e.OriginalSource as DependencyObject) != null) return;
-        if (e.OriginalSource is not (Border or StackPanel or Grid)) return;
+        if (e.OriginalSource is not (Border or StackPanel or Grid or DockRow)) return;
         _barDragging = true;
         _barDragMoved = false;
         _dragStart = PointToScreen(e.GetPosition(this));
@@ -313,7 +570,7 @@ public partial class DockWindow : GlassWindow
         Bar.Opacity = 1;
         if (!_barDragMoved) return;
         GetCursorPos(out var pt);
-        var mi = GetPrimaryMonitor(out _);
+        var mi = MonitorInfo(out _);
         var edge = pt.Y < (mi.rcMonitor.Top + mi.rcMonitor.Bottom) / 2 ? "top" : "bottom";
         if (edge != Settings.Current.Edge) { Settings.Current.Edge = edge; Settings.Save("dock"); }
     }
@@ -336,6 +593,8 @@ public partial class DockWindow : GlassWindow
         m.Items.Add(size);
         bool top = Settings.Current.Edge == "top";
         m.Items.Add(MI(top ? "Move to bottom" : "Move to top", () => { Settings.Current.Edge = top ? "bottom" : "top"; Settings.Save("dock"); }));
+        bool full = Settings.Current.BarWidth != "fit";
+        m.Items.Add(MI("Full width", () => { Settings.Current.BarWidth = full ? "fit" : "full"; Settings.Save("dock"); }, full));
         m.Items.Add(new Separator());
         m.Items.Add(MI("Task Manager", WinActions.OpenTaskManager));
         m.Items.Add(MI("Restart Vela", Restart));
@@ -412,7 +671,7 @@ public partial class DockWindow : GlassWindow
 
     bool IsFullscreenActive()
     {
-        if (SHQueryUserNotificationState(out int state) == 0 && state is 2 or 3 or 4) return true; // busy / D3D fullscreen / presentation
+        if (IsPrimary && SHQueryUserNotificationState(out int state) == 0 && state is 2 or 3 or 4) return true; // busy / D3D fullscreen / presentation
         var fg = GetForegroundWindow();
         if (fg == IntPtr.Zero || fg == Hwnd) return false;
         var cls = GetClassNameOf(fg);
@@ -420,7 +679,7 @@ public partial class DockWindow : GlassWindow
         long style = GetWindowLongPtr(fg, GWL_STYLE).ToInt64();
         if ((style & 0x00C00000L) == 0x00C00000L) return false; // has a caption => normal (maybe maximized) window
         if (!GetWindowRect(fg, out var r)) return false;
-        var mi = GetPrimaryMonitor(out _);
+        var mi = MonitorInfo(out _);
         var m = mi.rcMonitor;
         return r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom;
     }
@@ -442,7 +701,7 @@ public partial class DockWindow : GlassWindow
         else if (msg == _taskbarCreatedMsg && msg != 0)
         {
             Log.Info("Explorer restarted; re-applying taskbar + appbar");
-            Svc.Taskbar.OnExplorerRestarted();
+            if (IsPrimary) Svc.Taskbar.OnExplorerRestarted();
             _appBar?.Register();
             QueueReposition();
         }
@@ -460,6 +719,7 @@ public partial class DockWindow : GlassWindow
         else if (msg is WM_DISPLAYCHANGE or WM_DPICHANGED)
         {
             QueueReposition();
+            if (IsPrimary && msg == WM_DISPLAYCHANGE) Dispatcher.BeginInvoke(SyncDisplays, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
         else if (msg == WM_SETTINGCHANGE && wParam.ToInt32() == 0x0014 /*SPI_SETDESKWALLPAPER*/)
         {
@@ -474,8 +734,14 @@ public partial class DockWindow : GlassWindow
         try
         {
             Svc.Ticker.Tick -= OnTick;
-            if (Hwnd != IntPtr.Zero) Svc.Windows.Stop(Hwnd);
+            Svc.Windows.ForegroundChanged -= CheckFullscreen;
+            if (IsPrimary)
+            {
+                foreach (var d in All.Where(x => !x.IsPrimary).ToList()) { d.Teardown(); d.Close(); }
+                if (Hwnd != IntPtr.Zero) Svc.Windows.Stop(Hwnd);
+            }
             _appBar?.Dispose();
+            _appBar = null;
         }
         catch (Exception ex) { Log.Error("Dock teardown", ex); }
     }

@@ -4,20 +4,38 @@
                xmlns:v="clr-namespace:Vela.Views"
                Title="Vela Dock" Topmost="True" ShowActivated="False">
     <Grid x:Name="Root">
-        <!-- The bar. The window's region is clipped to this element (see GlassWindow.UpdateRegion).
-             Layers, bottom to top: Bar.Background (blurred wallpaper slice, glass styles only),
-             Tint (style colour), Sheen (rim light), widgets. -->
-        <Border x:Name="Bar"
-                HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                CornerRadius="20" BorderThickness="1" Padding="5"
-                BorderBrush="{DynamicResource Bar.Border}">
-            <Grid>
-                <Border x:Name="Tint" CornerRadius="19" Margin="-5"
-                        Background="{DynamicResource Bar.Background}" />
-                <Border x:Name="Sheen" CornerRadius="19" Margin="-5" IsHitTestVisible="False"
-                        Background="{DynamicResource Bar.Sheen}" />
-                <StackPanel x:Name="Items" Orientation="Horizontal" VerticalAlignment="Center" />
-            </Grid>
-        </Border>
+        <!-- BarHost carries the edge alignment, margins and the S/M/L scale.
+             Shadow: a blurred rounded rect under the bar (static, so it is rendered once).
+             Bar layers, bottom to top: Bar.Background (blurred wallpaper slice, glass styles only),
+             Tint (style colour), Sheen (rim light), the item row. The bar is clipped to its rounded
+             shape with an anti-aliased geometry (GlassWindow.UpdateRegion). -->
+        <Grid x:Name="BarHost" HorizontalAlignment="Stretch" VerticalAlignment="Bottom">
+            <Border x:Name="Shadow" CornerRadius="16" IsHitTestVisible="False" Background="#66000000" Margin="1,1,1,-1">
+                <Border.Effect>
+                    <BlurEffect Radius="9" KernelType="Gaussian" RenderingBias="Performance" />
+                </Border.Effect>
+            </Border>
+            <Border x:Name="Bar" CornerRadius="16" Padding="3"
+                    BorderThickness="{DynamicResource Hairline}"
+                    BorderBrush="{DynamicResource Bar.Border}">
+                <Grid>
+                    <Border x:Name="Tint" CornerRadius="16" Margin="-3"
+                            Background="{DynamicResource Bar.Background}" />
+                    <Border x:Name="Sheen" CornerRadius="16" Margin="-3" IsHitTestVisible="False"
+                            Background="{DynamicResource Bar.Sheen}" />
+                    <!-- Liquid Glass: a specular rim just inside the edge. -->
+                    <Border x:Name="Rim" CornerRadius="16" Margin="-3" IsHitTestVisible="False" BorderThickness="1.2"
+                            BorderBrush="{DynamicResource Bar.Rim}" />
+                    <DockPanel LastChildFill="True">
+                        <!-- Far-right corner, like the Windows taskbar: hover = peek at the desktop, click = show desktop. -->
+                        <Border x:Name="DesktopCorner" DockPanel.Dock="Right" Width="9" Margin="4,-3,-3,-3"
+                                Background="Transparent" Cursor="Hand" ToolTip="Show desktop">
+                            <Border Width="1" Height="20" HorizontalAlignment="Left" Background="{DynamicResource Divider}" />
+                        </Border>
+                        <v:DockRow x:Name="Items" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </v:GlassWindow>

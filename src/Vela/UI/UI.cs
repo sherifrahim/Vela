@@ -81,9 +81,11 @@ public static class UI
     }
 
     /// <summary>Tile caption ("Screen Time", "Session"...).</summary>
-    public static TextBlock Caption(string text, string brush = "Text.Secondary") => Text(text, 11, FontWeights.SemiBold, brush);
+    public static TextBlock Caption(string text, string brush = "Text.Secondary", double size = 8.5) => Text(text, size, FontWeights.SemiBold, brush);
+    /// <summary>Section label inside cards and windows ("Today", "Feels like"...).</summary>
+    public static TextBlock Label(string text, string brush = "Text.Secondary") => Text(text, 11, FontWeights.SemiBold, brush);
     /// <summary>Tile headline value ("2h 24m", "25:00"...).</summary>
-    public static TextBlock Value(string text, double size = 20) => Text(text, size, FontWeights.Bold);
+    public static TextBlock Value(string text, double size = 16) => Text(text, size, FontWeights.Bold);
 
     public static TextBlock Icon(string glyph, double size = 14, string brush = "Text.Primary")
     {
@@ -258,6 +260,8 @@ public sealed class Sparkline : FrameworkElement
         new FrameworkPropertyMetadata(Brushes.DodgerBlue, FrameworkPropertyMetadataOptions.AffectsRender));
     public Brush Stroke { get => (Brush)GetValue(StrokeProperty); set => SetValue(StrokeProperty, value); }
     public bool Bars { get; set; }
+    /// <summary>Draw a faint dotted baseline under the bars (Screen Time tile).</summary>
+    public bool Baseline { get; set; }
     public double? Max { get; set; }
 
     public Sparkline(string brush = "Accent") => SetResourceReference(StrokeProperty, brush);
@@ -274,7 +278,14 @@ public sealed class Sparkline : FrameworkElement
         if (max - min < 1e-9) max = min + 1;
         if (Bars)
         {
-            double slot = w / _values.Count, bw = Math.Max(1.5, slot * 0.55);
+            if (Baseline)
+            {
+                var pen = new Pen(Stroke, 0.6) { DashStyle = new DashStyle(new[] { 1.0, 2.0 }, 0) };
+                dc.PushOpacity(0.55);
+                dc.DrawLine(pen, new Point(0, h - 0.3), new Point(w, h - 0.3));
+                dc.Pop();
+            }
+            double slot = w / _values.Count, bw = Math.Max(1.2, slot * 0.5);
             for (int i = 0; i < _values.Count; i++)
             {
                 double bh = Math.Max(_values[i] > 0 ? 1.5 : 0.75, (_values[i] - min) / (max - min) * h);
@@ -376,12 +387,69 @@ public sealed class WeatherIcon : FrameworkElement
 /// <summary>Windows logo (four tiles) for the Start button.</summary>
 public sealed class WindowsLogo : FrameworkElement
 {
+    /// <summary>Windows 11 blue (light top-left to deeper bottom-right) instead of the theme text colour.</summary>
+    public bool Colored { get; set; }
+    static readonly Brush Blue = MakeBlue();
+    static Brush MakeBlue()
+    {
+        var g = new LinearGradientBrush(Color.FromRgb(0x5C, 0xC8, 0xFF), Color.FromRgb(0x00, 0x6C, 0xD8), new Point(0, 0), new Point(1, 1));
+        g.Freeze();
+        return g;
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
-        double s = Math.Min(ActualWidth, ActualHeight), gap = s * 0.08, q = (s - gap) / 2;
+        double s = Math.Min(ActualWidth, ActualHeight), gap = s * 0.07, q = (s - gap) / 2;
         double x0 = (ActualWidth - s) / 2, y0 = (ActualHeight - s) / 2;
-        var b = UI.Res("Text.Primary");
+        var b = Colored ? Blue : UI.Res("Text.Primary");
         for (int i = 0; i < 4; i++)
             dc.DrawRoundedRectangle(b, null, new Rect(x0 + (i % 2) * (q + gap), y0 + (i / 2) * (q + gap), q, q), q * 0.12, q * 0.12);
+    }
+}
+
+/// <summary>Lightning bolt (charging) drawn as a vector, filled white.</summary>
+public sealed class BoltMark : FrameworkElement
+{
+    static readonly Geometry Shape = Freeze(Geometry.Parse("M7,0 L0,13 L5.5,13 L4,24 L12,9 L6.5,9 L8.5,0 Z"));
+    static Geometry Freeze(Geometry g) { g.Freeze(); return g; }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        double sx = ActualWidth / 12, sy = ActualHeight / 24, s = Math.Min(sx, sy);
+        if (s <= 0) return;
+        dc.PushTransform(new TranslateTransform((ActualWidth - 12 * s) / 2, (ActualHeight - 24 * s) / 2));
+        dc.PushTransform(new ScaleTransform(s, s));
+        dc.DrawGeometry(Brushes.White, null, Shape);
+        dc.Pop(); dc.Pop();
+    }
+}
+
+/// <summary>Smart-watch mark (Screen Time), drawn in the accent colour: strap, case, face and hands.</summary>
+public sealed class WatchIcon : FrameworkElement
+{
+    public static readonly DependencyProperty FillProperty = DependencyProperty.Register(nameof(Fill), typeof(Brush), typeof(WatchIcon),
+        new FrameworkPropertyMetadata(Brushes.DodgerBlue, FrameworkPropertyMetadataOptions.AffectsRender));
+    public Brush Fill { get => (Brush)GetValue(FillProperty); set => SetValue(FillProperty, value); }
+
+    public WatchIcon(string brush = "Accent") => SetResourceReference(FillProperty, brush);
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        // Designed on a 14 × 24 grid.
+        double s = Math.Min(ActualWidth / 14, ActualHeight / 24);
+        if (s <= 0) return;
+        dc.PushTransform(new TranslateTransform((ActualWidth - 14 * s) / 2, (ActualHeight - 24 * s) / 2));
+        dc.PushTransform(new ScaleTransform(s, s));
+        dc.PushOpacity(0.75);
+        dc.DrawRoundedRectangle(Fill, null, new Rect(3, 0, 8, 24), 2.5, 2.5);   // strap
+        dc.Pop();
+        dc.DrawRoundedRectangle(Fill, null, new Rect(0.5, 4.5, 13, 15), 4, 4); // case
+        dc.DrawRoundedRectangle(Fill, null, new Rect(13, 9, 1.4, 3.5), 0.7, 0.7); // crown
+        var face = new SolidColorBrush(Color.FromArgb(0x55, 0, 0, 0));
+        dc.DrawRoundedRectangle(face, null, new Rect(2, 6, 10, 12), 3, 3);
+        var hand = new Pen(Brushes.White, 1.1) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        dc.DrawLine(hand, new Point(7, 12), new Point(7, 8.8));
+        dc.DrawLine(hand, new Point(7, 12), new Point(9.2, 13.2));
+        dc.Pop(); dc.Pop();
     }
 }

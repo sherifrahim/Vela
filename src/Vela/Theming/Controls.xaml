@@ -227,11 +227,11 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Ellipse Width="16" Height="16" Fill="White">
-                        <Ellipse.Effect>
-                            <DropShadowEffect BlurRadius="5" ShadowDepth="1" Opacity="0.35" />
-                        </Ellipse.Effect>
-                    </Ellipse>
+                    <!-- Rounded end of the accent fill with a white knob, as in the reference speaker slider. -->
+                    <Grid Width="14" Height="14">
+                        <Ellipse Fill="{DynamicResource Accent}" />
+                        <Ellipse Width="10" Height="10" Fill="White" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -243,7 +243,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
-                    <Border Background="{TemplateBinding Background}" CornerRadius="9" Height="18" />
+                    <Border Background="{TemplateBinding Background}" CornerRadius="7,0,0,7" Height="14" Margin="0,0,-7,0" />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -258,8 +258,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
-                    <Grid Height="20">
-                        <Border Background="{DynamicResource Fill.Track}" CornerRadius="9" Height="18" />
+                    <Grid Height="14">
+                        <Border Background="{DynamicResource Fill.Track}" CornerRadius="7" Height="14" />
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Style="{StaticResource Vela.SliderRepeat}" Background="{DynamicResource Accent}" Command="Slider.DecreaseLarge" />
@@ -268,7 +268,7 @@
                                 <RepeatButton Style="{StaticResource Vela.SliderRepeat}" Background="Transparent" Command="Slider.IncreaseLarge" />
                             </Track.IncreaseRepeatButton>
                             <Track.Thumb>
-                                <Thumb Style="{StaticResource Vela.SliderThumb}" Margin="-1,0" />
+                                <Thumb Style="{StaticResource Vela.SliderThumb}" />
                             </Track.Thumb>
                         </Track>
                     </Grid>

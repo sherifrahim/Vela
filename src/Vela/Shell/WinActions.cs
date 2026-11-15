@@ -61,6 +61,26 @@ public static class WinActions
     /// <summary>Empties the bin. Windows shows its own confirmation dialog (we don't pass NOCONFIRMATION).</summary>
     public static void EmptyRecycleBin() => SHEmptyRecycleBin(IntPtr.Zero, null, 0);
 
+    // ---------- more Windows shortcuts used by the control centre ----------
+    public static void OpenProject() => SendKeys(VK_LWIN, 0x50 /*P*/);
+    public static void OpenCast() => SendKeys(VK_LWIN, 0x4B /*K*/);
+    public static void OpenSnippingTool() => SendKeys(VK_LWIN, 0x10 /*Shift*/, 0x53 /*S*/);
+    public static void OpenEmojiPanel() => SendKeys(VK_LWIN, 0xBE /*.*/);
+    public static void LockPc() => LockWorkStation();
+    public static void OpenOnScreenKeyboard() => WindowTracker.Launch("osk.exe");
+
+    // ---------- peek at the desktop (taskbar corner) ----------
+    [DllImport("dwmapi.dll", EntryPoint = "#113")] static extern int DwmpActivateLivePreview(int peekOn, IntPtr hPeekWindow, IntPtr hTopmostWindow, uint peekType, IntPtr unknown);
+    static bool _peekBroken;
+
+    /// <summary>Aero-Peek style "look at the desktop" while hovering the corner (undocumented DWM call; no-op if unavailable).</summary>
+    public static void Peek(bool on, IntPtr keepVisible)
+    {
+        if (_peekBroken) return;
+        try { DwmpActivateLivePreview(on ? 1 : 0, FindWindow("Progman", null), keepVisible, 3, IntPtr.Zero); }
+        catch (Exception ex) { _peekBroken = true; Log.Warn("Desktop peek unavailable: " + ex.Message); }
+    }
+
     public static void TrimWorkingSet()
     {
         try { SetProcessWorkingSetSize(GetCurrentProcess(), new IntPtr(-1), new IntPtr(-1)); }

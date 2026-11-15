@@ -19,7 +19,12 @@ namespace Vela.Theming;
 /// </summary>
 public static class WallpaperGlass
 {
-    const int SampleWidth = 200;
+    /// <summary>Decode width + blur passes from Settings.GlassBlur (0 = crisp, 100 = very soft).</summary>
+    static (int width, int radius, int passes) Quality()
+    {
+        double b = Math.Clamp(Settings.Current.GlassBlur, 0, 100) / 100;
+        return ((int)(560 - b * 440), b < 0.05 ? 0 : 2, 1 + (int)Math.Round(b * 3));
+    }
     static BitmapSource? _image;
     static double _imgW, _imgH;
     public static event Action? Changed;
@@ -39,11 +44,13 @@ public static class WallpaperGlass
                 {
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.DecodePixelWidth = SampleWidth;
+                    bmp.DecodePixelWidth = Quality().width;
                     bmp.StreamSource = fs;
                     bmp.EndInit();
                 }
-                _image = BoxBlur(bmp, 2, 2);
+                var q = Quality();
+                // macOS-style vibrancy: glass styles get a saturation lift so colours glow through.
+                _image = BoxBlur(bmp, q.radius, q.radius == 0 ? 0 : q.passes, Settings.Current.GlassEffect is "frosted" or "liquid" ? 1.35 : 1.12);
             }
             else if (SolidColor() is { } c)
             {
@@ -107,7 +114,7 @@ public static class WallpaperGlass
     }
 
     /// <summary>Separable box blur, a few passes ≈ gaussian. Runs once on a ~200px image.</summary>
-    static BitmapSource BoxBlur(BitmapSource src, int radius, int passes)
+    static BitmapSource BoxBlur(BitmapSource src, int radius, int passes, double saturation = 1)
     {
         var fmt = new FormatConvertedBitmap(src, PixelFormats.Bgra32, null, 0);
         int w = fmt.PixelWidth, h = fmt.PixelHeight, stride = w * 4;
@@ -119,9 +126,22 @@ public static class WallpaperGlass
             Pass(a, b, w, h, radius, true);
             Pass(b, a, w, h, radius, false);
         }
+        if (Math.Abs(saturation - 1) > 0.01) Saturate(a, saturation);
         var result = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, a, stride);
         result.Freeze();
         return result;
+    }
+
+    static void Saturate(byte[] px, double s)
+    {
+        for (int i = 0; i < px.Length; i += 4)
+        {
+            double b = px[i], g = px[i + 1], r = px[i + 2];
+            double l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            px[i] = (byte)Math.Clamp(l + (b - l) * s, 0, 255);
+            px[i + 1] = (byte)Math.Clamp(l + (g - l) * s, 0, 255);
+            px[i + 2] = (byte)Math.Clamp(l + (r - l) * s, 0, 255);
+        }
     }
 
     static void Pass(byte[] src, byte[] dst, int w, int h, int r, bool horizontal)

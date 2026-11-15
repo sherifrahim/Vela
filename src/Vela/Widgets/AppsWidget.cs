@@ -29,6 +29,10 @@ public sealed class AppsWidget : WidgetBase
     }
 
     readonly Dictionary<string, AppItem> _items = new();
+    List<Group> _groups = new();
+    AppItem? _dragItem;
+    bool _dragging;
+    Point _dragStart;
     readonly List<string> _runningOrder = new();
     static readonly Dictionary<string, string> NameCache = new(StringComparer.OrdinalIgnoreCase);
     StackPanel _panel = null!;
@@ -38,9 +42,11 @@ public sealed class AppsWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        if (!IsPreview) Views.DockRow.SetFill(this, true); // full-width bar: the apps sit at the screen centre
         var start = new AppItem(null) { ToolTip = "Start" };
-        start.SetContent(new WindowsLogo { Width = 22, Height = 22 });
+        // The Windows 11 Start mark, full icon size, in its own blue.
+        start.SetContent(new WindowsLogo { Colored = true, Width = AppItem.IconSize - 3, Height = AppItem.IconSize - 3 });
         start.Clicked += WinActions.OpenStart;
         start.MenuRequested += m =>
         {
@@ -50,6 +56,12 @@ public sealed class AppsWidget : WidgetBase
             m.Items.Add(Item("File Explorer", () => WindowTracker.Launch("explorer.exe")));
         };
         _panel.Children.Add(start);
+        _panel.PreviewMouseLeftButtonDown += OnPanelDown;
+        _panel.PreviewMouseMove += OnPanelMove;
+        _panel.PreviewMouseLeftButtonUp += OnPanelUp;
+        _panel.MouseMove += OnMagMove;
+        _panel.MouseLeave += OnMagLeave;
+        _panel.Background = Brushes.Transparent; // hit-testable gaps, so the falloff tracks smoothly
         return _panel;
     }
 
@@ -64,6 +76,7 @@ public sealed class AppsWidget : WidgetBase
         Svc.Windows.Changed += Rebuild;
         Svc.Windows.ForegroundChanged += UpdateActive;
         Theming.ThemeManager.Changed += OnTheme;
+        Settings.Changed += OnSettings;
         Rebuild();
     }
 
@@ -72,7 +85,11 @@ public sealed class AppsWidget : WidgetBase
         Svc.Windows.Changed -= Rebuild;
         Svc.Windows.ForegroundChanged -= UpdateActive;
         Theming.ThemeManager.Changed -= OnTheme;
+        Settings.Changed -= OnSettings;
+        if (_magRunning) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
     }
+
+    void OnSettings(string what) { if (what == "pins") Rebuild(); }
 
     void OnTheme() { foreach (var c in _panel.Children.OfType<AppItem>()) c.InvalidateVisualTree(); }
 
@@ -141,7 +158,9 @@ public sealed class AppsWidget : WidgetBase
 
     void Rebuild()
     {
+        if (_dragging) return;
         var groups = BuildGroups();
+        _groups = groups;
         var keep = new HashSet<string>(groups.Select(g => g.Key));
         foreach (var dead in _items.Keys.Where(k => !keep.Contains(k)).ToList()) _items.Remove(dead);
 
@@ -152,7 +171,7 @@ public sealed class AppsWidget : WidgetBase
             if (!_items.TryGetValue(g.Key, out var item))
             {
                 item = new AppItem(g.Key);
-                var icon = new Image { Width = 30, Height = 30 };
+                var icon = new Image { Width = AppItem.IconSize, Height = AppItem.IconSize };
                 RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
                 item.SetContent(icon);
                 Svc.Icons.Get(g.IconSource, src => icon.Source = src);
@@ -220,6 +239,124 @@ public sealed class AppsWidget : WidgetBase
         m.Items.Add(Item("Widgets…", () => Views.DockWindow.Instance?.OpenWidgetPicker()));
         m.Items.Add(Item("Settings", () => Views.DockWindow.Instance?.OpenSettings()));
     }
+
+    // ---------- macOS-style magnification ----------
+    // Each frame, every icon eases toward a target scale from a cosine falloff around the pointer
+    // (measured in un-magnified slot units, so the strip doesn't chase itself). Runs only while the
+    // pointer is over the strip or icons are still settling, then unhooks: zero cost at rest.
+
+    double _mouseSlot = -100;
+    bool _magHover, _magRunning;
+    const double MagRange = 2.6; // how many neighbours (each side) grow with the hovered icon
+
+    void OnMagMove(object sender, MouseEventArgs e)
+    {
+        if (!Settings.Current.Magnification || IsPreview || _dragging) return;
+        double mx = e.GetPosition(_panel).X;
+        var items = _panel.Children.OfType<AppItem>().ToList();
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            double left = it.TranslatePoint(new Point(0, 0), _panel).X, w = Math.Max(1, it.ActualWidth);
+            if (mx < left + w || i == items.Count - 1) { _mouseSlot = i + Math.Clamp((mx - left) / w, 0, 1); break; }
+        }
+        _magHover = true;
+        StartMag();
+    }
+
+    void OnMagLeave(object sender, MouseEventArgs e) { _magHover = false; StartMag(); }
+
+    void StartMag()
+    {
+        if (_magRunning) return;
+        _magRunning = true;
+        CompositionTarget.Rendering += MagFrame;
+    }
+
+    void MagFrame(object? sender, EventArgs e)
+    {
+        double max = Math.Clamp(Settings.Current.MagnifyAmount, 1.05, 1.6);
+        bool settled = true;
+        int i = 0;
+        foreach (var it in _panel.Children.OfType<AppItem>())
+        {
+            double d = Math.Abs(i + 0.5 - _mouseSlot) / MagRange;
+            double target = _magHover && d < 1 ? 1 + (max - 1) * Math.Cos(d * Math.PI / 2) : 1;
+            double cur = it.Magnification, next = cur + (target - cur) * 0.28;
+            if (Math.Abs(target - next) < 0.003) next = target; else settled = false;
+            if (Math.Abs(next - cur) > 0.0005) it.Magnify(next);
+            i++;
+        }
+        if (settled && !_magHover) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
+    }
+
+    // ---------- drag icons to reorder pins (dropping a running app among them pins it) ----------
+
+    static AppItem? ItemFrom(object src)
+    {
+        for (var d = src as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d))
+            if (d is AppItem a) return a;
+        return null;
+    }
+
+    void OnPanelDown(object sender, MouseButtonEventArgs e)
+    {
+        if (IsPreview || EditMode) return;
+        var item = ItemFrom(e.OriginalSource);
+        if (item?.Key == null) return;
+        _dragItem = item;
+        _dragStart = e.GetPosition(_panel);
+    }
+
+    void OnPanelMove(object sender, MouseEventArgs e)
+    {
+        if (_dragItem == null || e.LeftButton != MouseButtonState.Pressed) return;
+        var p = e.GetPosition(_panel);
+        if (!_dragging)
+        {
+            if (Math.Abs(p.X - _dragStart.X) < 7) return;
+            _dragging = true;
+            _dragItem.Opacity = 0.7;
+            _panel.CaptureMouse();
+        }
+        int from = _panel.Children.IndexOf(_dragItem), target = 1; // 0 = Start, never moves
+        for (int i = 1; i < _panel.Children.Count; i++)
+        {
+            var c = (FrameworkElement)_panel.Children[i];
+            if (c == _dragItem) continue;
+            if (p.X > c.TranslatePoint(new Point(c.ActualWidth / 2, 0), _panel).X) target++;
+        }
+        if (target != from) { _panel.Children.RemoveAt(from); _panel.Children.Insert(target, _dragItem); }
+    }
+
+    void OnPanelUp(object sender, MouseButtonEventArgs e)
+    {
+        var item = _dragItem;
+        _dragItem = null;
+        if (!_dragging || item == null) return;
+        _dragging = false;
+        _panel.ReleaseMouseCapture();
+        item.Opacity = 1;
+        e.Handled = true;
+
+        var order = _panel.Children.OfType<AppItem>().Skip(1).Select(i => i.Key).ToList();
+        int lastPinned = order.FindLastIndex(k => _groups.Any(g => g.Key == k && g.Pin != null));
+        var pins = new List<PinnedApp>();
+        for (int i = 0; i < order.Count; i++)
+        {
+            var g = _groups.FirstOrDefault(x => x.Key == order[i]);
+            if (g == null) continue;
+            if (g.Pin != null) pins.Add(g.Pin);
+            else if (g.Key == item.Key && i <= lastPinned + 1 && g.LaunchPath != null && g.Windows.Count > 0)
+            {
+                var w = g.Windows[0];
+                pins.Add(new PinnedApp { Name = g.Name, LaunchPath = g.LaunchPath, TargetPath = w.ExePath, Aumid = w.Aumid });
+            }
+        }
+        Settings.Current.PinnedApps = pins;
+        Settings.Save();
+        Rebuild();
+    }
 }
 
 /// <summary>One app button: icon, hover lift, running dot(s), launch bounce.</summary>
@@ -231,6 +368,8 @@ public sealed class AppItem : Grid
     readonly ScaleTransform _scale = new(1, 1);
     bool _active;
     public string? Key { get; }
+    /// <summary>Icon size and slot width (DIPs at size M), from the reference: 25 px icons on a 36 px pitch.</summary>
+    public const double IconSize = 25, SlotWidth = 36;
 
     public event Action? Clicked;
     public event Action? MiddleClicked;
@@ -239,18 +378,18 @@ public sealed class AppItem : Grid
     public AppItem(string? key)
     {
         Key = key;
-        Width = 44;
+        Width = SlotWidth;
         Height = WidgetBase.TileHeight;
         Background = Brushes.Transparent;
         Cursor = Cursors.Hand;
-        _bg = new Border { CornerRadius = new CornerRadius(12), Margin = new Thickness(2, 2, 2, 2), Opacity = 0 };
+        _bg = new Border { CornerRadius = new CornerRadius(10), Margin = new Thickness(1, 3, 1, 3), Opacity = 0 };
         _bg.Bg("Tile.Hover");
         _content.HorizontalAlignment = HorizontalAlignment.Center;
         _content.VerticalAlignment = VerticalAlignment.Center;
-        _content.Margin = new Thickness(0, 0, 0, 2);
+        _content.Margin = new Thickness(0, 0, 0, 1);
         _content.RenderTransformOrigin = new Point(0.5, 1);
         _content.RenderTransform = new TransformGroup { Children = { _scale, _lift } };
-        _dot = new Border { Width = 4, Height = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 2), Visibility = Visibility.Collapsed };
+        _dot = new Border { Width = 3, Height = 3, CornerRadius = new CornerRadius(1.5), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 1.5), Visibility = Visibility.Collapsed };
         _dot.Bg("Accent");
         Children.Add(_bg);
         Children.Add(_content);
@@ -270,7 +409,7 @@ public sealed class AppItem : Grid
     {
         ToolTip = Settings.Current.ShowAppNames ? name : null;
         _dot.Visibility = windows > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _dot.Width = windows > 1 ? 10 : 4;
+        _dot.Width = windows > 1 ? 8 : 3;
         _dot.Bg(flashing ? "Sys.Orange" : "Accent");
     }
 
@@ -285,9 +424,22 @@ public sealed class AppItem : Grid
         foreach (var fe in new[] { _content.Content as UIElement }) fe?.InvalidateVisual();
     }
 
+    /// <summary>Magnification (macOS dock): scale grows from the bottom edge and the slot widens so neighbours make room.</summary>
+    public double Magnification { get; private set; } = 1;
+
+    public void Magnify(double s)
+    {
+        Magnification = s;
+        _scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        _scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        _scale.ScaleX = _scale.ScaleY = s;
+        Width = SlotWidth * (1 + (s - 1) * 0.75);
+    }
+
     void Hover(bool on)
     {
-        _bg.Opacity = _active ? 1 : on ? 0.7 : 0;
+        _bg.Opacity = _active ? 1 : on && !Settings.Current.Magnification ? 0.7 : 0;
+        if (Settings.Current.Magnification) return; // the strip drives scale itself (AppsWidget.Magnifier)
         var dur = TimeSpan.FromMilliseconds(on ? 140 : 180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         _scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(on ? 1.12 : 1, dur) { EasingFunction = ease });
@@ -298,7 +450,7 @@ public sealed class AppItem : Grid
     public void Bounce()
     {
         var a = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(1300) };
-        foreach (var (t, y) in new[] { (0, 0.0), (180, -10.0), (360, 0.0), (540, -6.0), (700, 0.0), (850, -3.0), (1000, 0.0) })
+        foreach (var (t, y) in new[] { (0, 0.0), (180, -8.0), (360, 0.0), (540, -4.5), (700, 0.0), (850, -2.0), (1000, 0.0) })
             a.KeyFrames.Add(new EasingDoubleKeyFrame(y, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(t)), new QuadraticEase { EasingMode = y < 0 ? EasingMode.EaseOut : EasingMode.EaseIn }));
         _lift.BeginAnimation(TranslateTransform.YProperty, a);
     }

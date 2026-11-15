@@ -92,6 +92,23 @@ public sealed class RadioService
         catch { WinOpen(k); }
     }
 
+    public async Task SetAsync(RadioKind k, bool on)
+    {
+        var r = Find(k);
+        if (r == null) { WinOpen(k); return; }
+        try { await r.SetStateAsync(on ? RadioState.On : RadioState.Off); } catch { WinOpen(k); }
+    }
+
+    /// <summary>Airplane mode as Windows shows it: every radio off.</summary>
+    public bool AirplaneOn => _radios is { Count: > 0 } rs && rs.All(r => r.State != RadioState.On);
+
+    public async Task SetAirplaneAsync(bool on)
+    {
+        if (_radios == null) { Shell.WinActions.OpenSettings("network-airplanemode"); return; }
+        foreach (var r in _radios)
+            try { await r.SetStateAsync(on ? RadioState.Off : RadioState.On); } catch { }
+    }
+
     static void WinOpen(RadioKind k) => Shell.WinActions.OpenSettings(k == RadioKind.Bluetooth ? "bluetooth" : "network-wifi");
 }
 

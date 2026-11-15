@@ -34,20 +34,35 @@ public sealed class FlyoutWindow : GlassWindow
 
     public static void CloseCurrent() => Current?.CloseAnimated();
 
+    /// <summary>Swap the open card's content in place (e.g. Control Centre → Wi-Fi list); it re-anchors itself.</summary>
+    public static void Navigate(UIElement content)
+    {
+        if (Current == null) return;
+        Current._root.Child = content;
+    }
+
+    /// <summary>Open a card for <paramref name="anchor"/> even if another card is open (no toggle-close).</summary>
+    public static void Show(FrameworkElement anchor, UIElement content, double width = 340)
+    {
+        if (Current != null && Current.Anchor == anchor) { Navigate(content); return; }
+        Toggle(anchor, content, width);
+    }
+
     FlyoutWindow(FrameworkElement anchor, UIElement content, double width)
     {
         Anchor = anchor;
         Topmost = true;
         ShowActivated = true;
         SizeToContent = SizeToContent.WidthAndHeight;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = -20000; Top = -20000; // placed over the anchor once laid out (Position)
         Title = "Vela card";
-        RegionRadius = 20;
+        RegionRadius = 22;
 
         _root = new Border
         {
             Width = width,
-            CornerRadius = new CornerRadius(20),
-            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(22),
             Padding = new Thickness(18),
             Child = content,
             RenderTransform = _slide,
@@ -55,6 +70,7 @@ public sealed class FlyoutWindow : GlassWindow
         };
         _root.SetResourceReference(Border.BackgroundProperty, "Flyout.Background");
         _root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
+        _root.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         RegionElement = _root;
         Content = _root;
 
@@ -62,26 +78,58 @@ public sealed class FlyoutWindow : GlassWindow
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) CloseAnimated(); };
         SizeChanged += (_, _) => Position();
         Loaded += (_, _) => { Position(); Animate(true); };
-        Closed += (_, _) => { if (Current == this) Current = null; };
+        Closed += (_, _) => { if (Current == this) Current = null; TrimSoon(); };
+    }
+
+    static System.Windows.Threading.DispatcherTimer? _trim;
+
+    /// <summary>Give memory back a few seconds after the last card closes (cards pull in WinRT, images…).</summary>
+    static void TrimSoon()
+    {
+        _trim ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _trim.Stop();
+        _trim.Tick -= OnTrim;
+        _trim.Tick += OnTrim;
+        _trim.Start();
+    }
+
+    static void OnTrim(object? s, EventArgs e)
+    {
+        _trim?.Stop();
+        if (Current != null) return;
+        GC.Collect(2, GCCollectionMode.Optimized, false);
+        Shell.WinActions.TrimWorkingSet();
     }
 
     bool DockAtTop => Settings.Current.Edge == "top";
 
+    /// <summary>
+    /// Centre the card over its widget, just above the bar (below it when docked at the top), clamped to
+    /// the screen. Positioned through WPF's Left/Top (DIPs): a raw SetWindowPos gets overwritten by WPF's
+    /// own size-to-content pass, which is what used to drop cards in the middle of the screen.
+    /// </summary>
     void Position()
     {
-        if (Hwnd == IntPtr.Zero || !Anchor.IsLoaded || PresentationSource.FromVisual(Anchor) == null) return;
-        var tl = Anchor.PointToScreen(new Point(0, 0));
+        if (!Anchor.IsLoaded || PresentationSource.FromVisual(Anchor) == null || ActualWidth <= 0) return;
+        var tl = Anchor.PointToScreen(new Point(0, 0));                                    // physical px
         var br = Anchor.PointToScreen(new Point(Anchor.ActualWidth, Anchor.ActualHeight));
-        double s = DpiScale;
-        int w = (int)Math.Ceiling(ActualWidth * s), h = (int)Math.Ceiling(ActualHeight * s);
-        int gap = (int)(10 * s);
+        double s = DpiScale, w = ActualWidth, h = ActualHeight, gap = 8;
+        var dockWin = DockWindow.For(Anchor);
+        var area = (dockWin?.MonitorInfo(out _) ?? GetPrimaryMonitor(out _)).rcMonitor;
+        double left = area.Left / s + gap, right = area.Right / s - gap, top = area.Top / s + gap, bottom = area.Bottom / s - gap;
 
-        var mi = GetPrimaryMonitor(out _);
-        var area = mi.rcMonitor;
-        int x = (int)((tl.X + br.X) / 2 - w / 2.0);
-        x = Math.Clamp(x, area.Left + gap, Math.Max(area.Left + gap, area.Right - gap - w));
-        int y = DockAtTop ? (int)br.Y + gap : (int)tl.Y - gap - h;
-        SetWindowPos(Hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE);
+        // Anchor to the bar's edge, not the tile's, so every card sits at the same height.
+        double barTop = tl.Y / s, barBottom = br.Y / s;
+        if (dockWin is { } dock && PresentationSource.FromVisual(dock.BarElement) != null)
+        {
+            barTop = dock.BarElement.PointToScreen(new Point(0, 0)).Y / s;
+            barBottom = dock.BarElement.PointToScreen(new Point(0, dock.BarElement.ActualHeight)).Y / s;
+        }
+        double x = Math.Clamp((tl.X + br.X) / 2 / s - w / 2, left, Math.Max(left, right - w));
+        double y = DockAtTop ? barBottom + gap : barTop - gap - h;
+        y = Math.Clamp(y, top, Math.Max(top, bottom - h));
+        if (Math.Abs(Left - x) > 0.5) Left = x;
+        if (Math.Abs(Top - y) > 0.5) Top = y;
     }
 
     void Animate(bool open)

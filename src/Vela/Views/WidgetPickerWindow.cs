@@ -117,7 +117,7 @@ public sealed class WidgetPickerWindow : GlassWindow
         _sections.Children.Clear();
 
         var q = _search.Text.Trim();
-        var list = WidgetRegistry.All.Where(d =>
+        var list = WidgetRegistry.All.Where(d => !d.Hidden &&
             (_category == null || d.Category == _category) &&
             (q.Length == 0 || d.Name.Contains(q, StringComparison.OrdinalIgnoreCase) || d.Category.Contains(q, StringComparison.OrdinalIgnoreCase))).ToList();
 

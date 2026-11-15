@@ -2,7 +2,7 @@ using Vela.Core;
 
 namespace Vela.Widgets;
 
-public sealed record WidgetDescriptor(string Type, string Name, string Category, Func<WidgetBase> Factory, string? Connector = null);
+public sealed record WidgetDescriptor(string Type, string Name, string Category, Func<WidgetBase> Factory, string? Connector = null, bool Hidden = false);
 
 /// <summary>
 /// The catalogue shown in the widget picker. To add a widget: write a WidgetBase subclass and add
@@ -21,6 +21,7 @@ public static class WidgetRegistry
         new("clock", "Clock", "Clocks", () => new ClockWidget()),
         new("clock.digital", "Big Clock", "Clocks", () => new BigClockWidget()),
         new("date", "Day Number", "Clocks", () => new DayNumberWidget()),
+        new("calendar", "Calendar", "Clocks", () => new CalendarWidget()),
         new("dayprogress", "Day Progress", "Clocks", () => new ProgressRingWidget(ProgressRingWidget.Span.Day)),
         new("monthprogress", "Month Progress", "Clocks", () => new ProgressRingWidget(ProgressRingWidget.Span.Month)),
         new("yearprogress", "Year Progress", "Clocks", () => new YearDotsWidget()),
@@ -36,6 +37,7 @@ public static class WidgetRegistry
 
         // System
         new("sysstats", "System Stats", "System", () => new SystemStatsWidget()),
+        new("sysmon", "System Monitor", "System", () => new SystemMonitorWidget()),
         new("cpu", "CPU", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Cpu)),
         new("ram", "RAM", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Ram)),
         new("network", "Network", "System", () => new NetworkWidget()),
@@ -48,6 +50,7 @@ public static class WidgetRegistry
         new("notifications", "Notifications", "System", () => new ActionWidget(ActionWidget.Kind.Notifications)),
         new("showdesktop", "Show Desktop", "System", () => new ActionWidget(ActionWidget.Kind.ShowDesktop)),
         new("taskmanager", "Task Manager", "System", () => new ActionWidget(ActionWidget.Kind.TaskManager)),
+        new("controlcenter", "Control Centre", "System", () => new ControlCenterWidget()),
 
         // Apps & Files
         new("apps", "Apps", "Apps & Files", () => new AppsWidget()),
@@ -57,6 +60,7 @@ public static class WidgetRegistry
         // Media & Audio
         new("nowplaying", "Now Playing", "Media & Audio", () => new NowPlayingWidget()),
         new("nowplaying.mini", "Now Playing Mini", "Media & Audio", () => new NowPlayingMiniWidget()),
+        new("nowplaying.art", "Album Art", "Media & Audio", () => new AlbumArtWidget()),
         new("volume", "Audio Output", "Media & Audio", () => new VolumeWidget()),
         new("microphone", "Microphone", "Media & Audio", () => new MicrophoneWidget()),
 
@@ -75,6 +79,9 @@ public static class WidgetRegistry
 
         // Online
         new("github", "GitHub", "Online & Mail", () => new GitHubWidget(), "github"),
+
+        // Containers (not in the picker; created from widget menus)
+        new("stack", "Stack", "Layout", () => new StackWidget(), Hidden: true),
     };
 
     public static WidgetDescriptor? Get(string type) => All.FirstOrDefault(d => d.Type == type);

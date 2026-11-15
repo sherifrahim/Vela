@@ -16,6 +16,7 @@ namespace Vela.Widgets;
 public sealed class ClockWidget : WidgetBase
 {
     TextBlock _day = null!, _date = null!, _time = null!, _ampm = null!, _temp = null!;
+    Border _divider = null!;
     WeatherIcon _icon = null!;
     StackPanel _weather = null!;
 
@@ -23,19 +24,25 @@ public sealed class ClockWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _day = Text("", 9.5, FontWeights.Bold, "Sys.Red");
-        _date = Text("", 15, FontWeights.Bold);
-        _time = Text("", 17, FontWeights.Bold);
-        _ampm = Text("", 9, FontWeights.Bold).Margin(2, 0, 0, 2);
+        _day = Text("", 7, FontWeights.Bold, "Sys.Red");
+        _date = Text("", 12.5, FontWeights.Bold);
+        _time = Text("", 12.5, FontWeights.Bold);
+        _ampm = Text("", 7, FontWeights.Bold).Margin(1.5, 0, 0, 1.5);
         _ampm.VerticalAlignment = VerticalAlignment.Bottom;
-        _icon = new WeatherIcon { Width = 12, Height = 12, Margin = new Thickness(0, 0, 3, 0) };
-        _temp = Text("", 10.5, FontWeights.SemiBold, "Text.Secondary");
+        _icon = new WeatherIcon { Width = 9, Height = 9, Margin = new Thickness(0, 0, 3, 0) };
+        _temp = Text("", 7.5, FontWeights.SemiBold, "Text.Secondary");
         _weather = H(_icon, _temp).Right();
+        _weather.Margin = new Thickness(0, 1, 0, 0);
         _weather.Visibility = Visibility.Collapsed;
 
-        var left = V(_day, _date).Margin(2, 0, 22, 0);
+        var left = V(_day, _date.Margin(0, -1, 0, 0));
+        left.MinWidth = 44;
+        left.Margin = new Thickness(2, 0, 0, 0);
+        _divider = new Border { Width = 1, Height = 24, Margin = new Thickness(14, 0, 14, 0) }.Bg("Divider");
+        var divider = _divider;
         var right = V(H(_time, _ampm).Right(), _weather);
-        return H(left, right);
+        right.MinWidth = 44;
+        return H(left, divider, right);
     }
 
     protected override void OnAttach()
@@ -63,6 +70,13 @@ public sealed class ClockWidget : WidgetBase
         else { _time.Text = now.ToString("h:mm"); _ampm.Text = now.ToString("tt", CultureInfo.InvariantCulture); }
     }
 
+    /// <summary>Date half → calendar card; time half → the Windows Clock app (alarms, timers, world clock).</summary>
+    protected override void OnClick()
+    {
+        if (System.Windows.Input.Mouse.GetPosition(_divider).X > 0) Shell.WindowTracker.OpenUri("ms-clock:");
+        else OpenCard();
+    }
+
     protected override UIElement BuildCard() => new MonthCalendar();
     protected override double CardWidth => 320;
 
@@ -81,11 +95,11 @@ public sealed class BigClockWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _time = Text("", 24, FontWeights.Bold);
-        _sec = Text("", 12, FontWeights.SemiBold, "Text.Secondary").Margin(3, 0, 0, 4);
+        _time = Text("", 19, FontWeights.Bold);
+        _sec = Text("", 9.5, FontWeights.SemiBold, "Text.Secondary").Margin(2, 0, 0, 3);
         _sec.VerticalAlignment = VerticalAlignment.Bottom;
-        _date = Text("", 10, FontWeights.SemiBold, "Text.Secondary");
-        return V(H(_time, _sec), _date).Margin(4, 0);
+        _date = Text("", 8, FontWeights.SemiBold, "Text.Secondary");
+        return V(H(_time, _sec), _date.Margin(0, -2, 0, 0)).Margin(2, 0);
     }
 
     protected override void OnTick(DateTime now)
@@ -107,8 +121,8 @@ public sealed class DayNumberWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _wd = Text("", 9.5, FontWeights.Bold, "Sys.Red").Center();
-        _n = Text("", 20, FontWeights.Bold).Center();
+        _wd = Text("", 7, FontWeights.Bold, "Sys.Red").Center();
+        _n = Text("", 16, FontWeights.Bold).Center();
         _n.Margin = new Thickness(0, -3, 0, 0);
         return V(_wd, _n).Margin(4, 0);
     }
@@ -137,11 +151,11 @@ public sealed class ProgressRingWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _ring = new RingGauge(_span == Span.Day ? "Sys.Orange" : "Sys.Purple") { Width = 34, Height = 34, Thickness = 4 };
-        _pct = Text("", 10, FontWeights.Bold).Center();
-        var g = new Grid { Width = 34, Height = 34 };
+        _ring = new RingGauge(_span == Span.Day ? "Sys.Orange" : "Sys.Purple") { Width = 30, Height = 30, Thickness = 3 };
+        _pct = Text("", 8.5, FontWeights.Bold).Center();
+        var g = new Grid { Width = 30, Height = 30 };
         g.Children.Add(_ring); g.Children.Add(_pct);
-        _label = Text("", 11, FontWeights.SemiBold, "Text.Secondary").Margin(8, 0, 2, 0);
+        _label = Text("", 9, FontWeights.SemiBold);
         return H(g, V(Caption(_span == Span.Day ? "Day" : "Month"), _label).Margin(8, 0, 2, 0));
     }
 
@@ -168,14 +182,14 @@ public sealed class YearDotsWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        var grid = new UniformGrid { Rows = Rows, Columns = Cols, Width = Cols * 7.5, Height = Rows * 7 };
+        var grid = new UniformGrid { Rows = Rows, Columns = Cols, Width = Cols * 6.6, Height = Rows * 6 };
         for (int i = 0; i < _dots.Length; i++)
         {
-            _dots[i] = new Ellipse { Width = 5.5, Height = 5.5 };
+            _dots[i] = new Ellipse { Width = 4.6, Height = 4.6 };
             grid.Children.Add(_dots[i]);
         }
-        _left = Text("", 9, FontWeights.SemiBold, "Text.Secondary");
-        _right = Text("", 9, FontWeights.Bold);
+        _left = Text("", 7, FontWeights.SemiBold, "Text.Secondary");
+        _right = Text("", 7.5, FontWeights.Bold);
         var foot = Columns("*,auto", _left, _right);
         foot.Margin = new Thickness(0, 2, 0, 0);
         return V(grid, foot);
@@ -212,8 +226,9 @@ public sealed class MonthCalendar : StackPanel
             dow.Children.Add(Text(CultureInfo.CurrentCulture.DateTimeFormat.ShortestDayNames[((int)first + i) % 7], 11, FontWeights.SemiBold, "Text.Tertiary").Center());
         Children.Add(dow);
         Children.Add(_grid);
-        var today = Text(DateTime.Today.ToString("dddd, MMMM d, yyyy"), 12, FontWeights.SemiBold, "Text.Secondary").Margin(0, 12, 0, 0);
-        Children.Add(today);
+        var today = Text(DateTime.Today.ToString("dddd, MMMM d, yyyy"), 12, FontWeights.SemiBold, "Text.Secondary");
+        var open = PillButton("Open Calendar", () => { FlyoutWindow.CloseCurrent(); Shell.WindowTracker.OpenUri("outlookcal:"); });
+        Children.Add(Columns("*,auto", today, open).Margin(0, 12, 0, 0));
         Render();
     }
 
@@ -235,4 +250,41 @@ public sealed class MonthCalendar : StackPanel
             _grid.Children.Add(cell);
         }
     }
+}
+
+/// <summary>
+/// Calendar page + today's line, like the reference "SUN 11 · No upcoming events" tile.
+/// Click: month card (with "Open Calendar"). Reading Windows calendar events needs package identity,
+/// so the tile shows the day, week number and how much of the working day is left instead.
+/// </summary>
+public sealed class CalendarWidget : WidgetBase
+{
+    TextBlock _wd = null!, _n = null!, _title = null!, _sub = null!;
+    protected override int TickSeconds => 30;
+
+    protected override UIElement BuildContent()
+    {
+        _wd = Text("", 6.5, FontWeights.Bold, "Sys.Red").Center();
+        _n = Text("", 13.5, FontWeights.Bold).Center();
+        _n.Margin = new Thickness(0, -2, 0, 0);
+        var page = new Border { Width = 30, Height = 32, CornerRadius = new CornerRadius(7), Child = V(_wd, _n) }.Bg("Fill.Control");
+        _title = Text("", 10, FontWeights.Bold);
+        _sub = Text("", 8, null, "Text.Secondary");
+        return H(page, V(_title, _sub).Margin(9, 0, 4, 0));
+    }
+
+    protected override void OnTick(DateTime now)
+    {
+        _wd.Text = now.ToString("ddd", CultureInfo.CurrentCulture).ToUpperInvariant();
+        _n.Text = now.Day.ToString();
+        int week = ISOWeek.GetWeekOfYear(now);
+        _title.Text = now.ToString("dddd", CultureInfo.CurrentCulture);
+        var end = now.Date.AddHours(18);
+        _sub.Text = now < end && now.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)
+            ? $"Week {week} · {Math.Ceiling((end - now).TotalHours):0}h of workday left"
+            : $"Week {week} · click to plan your day";
+    }
+
+    protected override UIElement BuildCard() => new MonthCalendar();
+    protected override double CardWidth => 320;
 }
