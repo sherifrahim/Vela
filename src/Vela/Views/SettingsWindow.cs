@@ -76,12 +76,19 @@ public sealed class SettingsWindow : GlassWindow
         root.Child = grid;
         Content = root;
 
-        foreach (var drag in new FrameworkElement[] { header, brand, sideBg })
-            drag.MouseLeftButtonDown += (_, e) => { if (e.OriginalSource is Grid or TextBlock or Border or DockPanel or StackPanel) try { DragMove(); } catch { } };
+        // Drag the window by its title area or the brand only. (Dragging from the whole sidebar used to start a
+        // window move on every press, which swallowed clicks on the page list.)
+        header.MouseLeftButtonDown += (_, e) => { if (e.OriginalSource == header || e.OriginalSource == _pageTitle) TryDrag(); };
+        brand.MouseLeftButtonDown += (_, _) => TryDrag();
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
         Settings.Changed += OnSettingsChanged;
         Closed += (_, _) => Settings.Changed -= OnSettingsChanged;
         Show(_page);
+    }
+
+    void TryDrag()
+    {
+        try { if (Mouse.LeftButton == MouseButtonState.Pressed) DragMove(); } catch (InvalidOperationException) { }
     }
 
     void OnSettingsChanged(string what) { if (what is "widgets" or "pins") Rebuild(); }
@@ -98,7 +105,7 @@ public sealed class SettingsWindow : GlassWindow
             if (sel) b.Bg("Accent");
             else { b.MouseEnter += (_, _) => b.Bg("Fill.Control"); b.MouseLeave += (_, _) => b.Background = Brushes.Transparent; }
             var p = name;
-            b.MouseLeftButtonUp += (_, _) => Show(p);
+            b.MouseLeftButtonDown += (_, e) => { e.Handled = true; Show(p); };
             _nav.Children.Add(b);
         }
         _pageTitle.Text = page;

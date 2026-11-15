@@ -13,7 +13,7 @@ Bluetooth battery, clock → Clock app / calendar → calendar, a dock on every 
 
 **Git:** history rewritten on request — `main` is now a single root commit `6abe471` (same tree as the old
 `addfea4`). The remote (`sherifrahim/Vela`) still has the old 4-commit history; publishing needs a force-push,
-which the owner has not approved yet. This session's work is committed on `main` (owner asked), not pushed.
+(force-pushed later on request). Session 2 work committed + pushed. Afterwards: fixed control-panel pages being unreachable (sidebar DragMove swallowed clicks) — verified Appearance → Style switching live.
 
 **Changed**
 - Measured the reference (`reference/lumabar/assets/desktop-preview.webp`: 1 px there ≈ 1 DIP on the owner's

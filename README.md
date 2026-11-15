@@ -19,6 +19,14 @@ no Electron, no Chromium. Idle cost: ~0 % CPU, ~40 MB working set.
 - **Widget picker:** right-click the dock → *Widgets…*, then click to add or remove; drag to reorder while it's open.
 - **Private:** no account, no server, no telemetry. Keys are encrypted with Windows DPAPI on this PC.
 
+## Screenshots
+
+![Vela dock, Liquid Glass style](docs/screenshots/dock.png)
+
+![Vela dock, White style](docs/screenshots/dock-white.png)
+
+<img src="docs/screenshots/control-panel.png" alt="Vela control panel" width="640">
+
 ## Run it
 
 Requires the .NET 10 SDK to build (or use `tools/publish.ps1` for a self-contained copy).
