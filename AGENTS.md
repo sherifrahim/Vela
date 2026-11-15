@@ -1,0 +1,120 @@
+# AGENTS.md — read this first
+
+This file is the shared brief for **every coding agent** working here (OpenAI Codex reads `AGENTS.md`
+automatically; Claude Code reads it through `CLAUDE.md`). The owner switches between agents when one runs
+out of usage, so **leave the repo in a state the other agent can pick up cold**. See "Handoff protocol".
+
+## What this project is
+
+**Vela** is a native Windows 10/11 taskbar replacement: one floating "widget dock" on the top or bottom
+screen edge holding your apps (pinned + running) and live widgets (clock, media, volume, system stats,
+screen time, AI plan limits, weather, todos, notes, revenue…), in five styles (Black, White, Liquid Glass,
+Frost Glass, Midnight) and three sizes.
+
+It is the owner's **personal re-imagining of lumabar.xyz**, which is a closed-source Electron app.
+Goal: same look, layout and behaviour, but native (WPF/.NET, no Chromium), fast, and lean on memory.
+
+- `reference/lumabar/` holds lumabar's public README + screenshots **for visual reference only**.
+  Never ship, embed or copy those images, its name, or its logo. Match the *design language*, not the assets.
+- `docs/REFERENCE.md` — what the original does (feature inventory); the parity target.
+- `docs/ROADMAP.md` — parity checklist with status. **Pick work from here.**
+- `docs/PROGRESS.md` — session log + "next up". **Update it at the end of every session.**
+- `docs/ARCHITECTURE.md` — how it works, and why (read before touching rendering, appbar or taskbar code).
+- `docs/ADDING_A_WIDGET.md` — recipe for widgets, connectors and styles.
+
+## Stack
+
+- C# 13 / **.NET 10**, **WPF** (native XAML), single project `src/Vela/Vela.csproj`.
+- TFM `net10.0-windows10.0.19041.0` (WinRT projections for media + radios), runs on Windows 10 1809+.
+- No third-party UI libraries. Only package: `System.Management` (WMI brightness).
+- Win32 via P/Invoke in `src/Vela/Interop/` (user32, shell32, dwmapi, Core Audio COM, DPAPI).
+
+## Build / run / test
+
+```powershell
+dotnet build src/Vela/Vela.csproj                     # debug build
+powershell -File tools/dev.ps1                          # quit running dock → build → start (the dev loop)
+src/Vela/bin/Debug/net10.0-windows10.0.19041.0/Vela.exe # run
+Vela.exe --quit            # close a running dock cleanly (restores the taskbar)
+Vela.exe --widgets         # open the widget picker in the running dock
+Vela.exe --settings        # open Settings in the running dock
+Vela.exe --restore-taskbar # emergency: put the Windows taskbar back
+powershell -File tools/publish.ps1                      # self-contained Release build → ./publish/win-x64
+```
+
+Visual checks (no UI automation needed):
+`tools/screenshot.ps1 -Out shot.png -CropBottom 140` captures the dock strip; `tools/vela-windows.ps1`
+lists Vela's windows, rects and clip regions. Logs: `%LOCALAPPDATA%\Vela\logs\vela.log`.
+
+There is no unit-test project yet (see ROADMAP "Engineering"). "Done" currently means: builds with
+0 errors, the dock starts, the change is visible in a screenshot, `vela.log` has no new ERROR lines, and
+`Vela.exe --quit` still logs "Vela stopped cleanly".
+
+## Ground rules (do not break these)
+
+1. **The Windows taskbar must always come back.** Any change near `Shell/TaskbarController.cs`,
+   `App.Cleanup()` or `DockWindow.Teardown()` must keep: marker file before modifying → restore on exit,
+   session end, crash → `--restore-taskbar` fallback. Test with `--quit` after every run.
+2. **Never kill the dock with `taskkill /F` during development** unless you then run `Vela.exe --restore-taskbar`.
+   Use `Vela.exe --quit`.
+3. **Performance budget:** idle CPU ≈ 0 (measured 0.16% of one core), working set ≈ 40 MB after trim.
+   - All widgets share one 1 Hz `Svc.Ticker`; never add per-widget timers or busy loops.
+   - Services poll only while a widget is subscribed (see the `event` add/remove pattern in
+     `SystemMonitor`, `AudioEndpoint`, `PollingConnector`). Unsubscribe in `OnDetach`.
+   - No blocking I/O on the UI thread. Network = `Core.Http.Client` only.
+   - No continuous animations; transitions ≤ 200 ms.
+4. **Privacy:** no telemetry, no Vela server. Connectors talk directly to their service. API keys go
+   through `Core.Secrets` (DPAPI), never `settings.json`. Never modify another app's files (e.g. Claude
+   Code / Codex credentials are read-only).
+5. **Persisted ids are API.** Widget `Type` ids (`WidgetRegistry`) and settings property names are stored
+   in users' `settings.json`. Don't rename them; add migrations if you must.
+6. Keep the code style: small sealed classes, code-built widget UIs via `UI/UI.cs` helpers, theme colours
+   only through DynamicResource keys (`Text.Primary`, `Tile.Background`, `Accent`, `Sys.Red`…), never
+   hard-coded colours in widgets (brand badges excepted).
+
+## Repo map
+
+```
+src/Vela/
+  App.xaml(.cs)          startup, single instance, CLI switches, crash/exit cleanup
+  Core/                  Paths, Log, Json, Settings (settings.json), Secrets (DPAPI), DataStore (todos/notes), Ticker, Http, Fmt
+  Interop/               Native.cs (P/Invoke), ShellCom.cs (shell + Core Audio COM interfaces)
+  Shell/                 AppBar, TaskbarController, WindowTracker, IconCache, WinActions, TaskbarPins
+  Services/              Services.cs (the `Svc` locator), SystemMonitor, Audio, Media, Weather, ScreenTime, Brightness/Radios/Markets
+  Connectors/            IConnector + PollingConnector; Claude, Codex, GitHub, Stripe
+  Theming/               Theme.cs (palettes → brushes), Controls.xaml (control styles), WallpaperGlass.cs
+  UI/                    UI.cs: builders (Text, Icon, buttons, Progress), RingGauge, Sparkline, WeatherIcon, Glyphs
+  Views/                 GlassWindow (base), DockWindow, FlyoutWindow (+ Card helpers), WidgetPickerWindow, SettingsWindow
+  Widgets/               WidgetBase, WidgetRegistry, and one file per category
+tools/                   dev.ps1, publish.ps1, screenshot.ps1, vela-windows.ps1, crop.ps1
+docs/                    ARCHITECTURE, ROADMAP, PROGRESS, REFERENCE, ADDING_A_WIDGET
+reference/lumabar/       original app's public README + screenshots (reference only, do not ship)
+```
+
+## Known gotchas (learned the hard way)
+
+- **Rendering:** windows are *layered* (`AllowsTransparency=true`) + a rounded `SetWindowRgn`. The
+  non-layered "WindowChrome glass" path renders **black** once a region is set. DWM blur/acrylic is
+  **off** because on layered windows it ignores the region and fills the whole rectangle. The dock's
+  glass is a pre-blurred wallpaper slice (`Theming/WallpaperGlass.cs`). Details in ARCHITECTURE.md.
+- WPF SDK drops `System.IO` from implicit usings; it's re-added in `GlobalUsings.cs`. Files that import
+  `System.Windows.Shapes` must write `System.IO.Path` explicitly.
+- `Svc` is a global alias for `Vela.Services.Services`. Inside namespace `Vela.*`, a bare `Services`
+  resolves to the *namespace*.
+- PowerShell passes `$null` to a `string` P/Invoke parameter as `""`. Use `[NullString]::Value`
+  (relevant for FindWindow in test scripts).
+- `Glyphs` in `UI/UI.cs` contain the raw Private-Use-Area characters (Segoe Fluent Icons / MDL2). Write new
+  ones as `""` escapes; some shell tools mangle the raw characters.
+- The computer-use screenshot tool can't target Vela (not a Start-menu app). Use `tools/screenshot.ps1`.
+- The display here is 2560×1600 at 175 %. Always reason in physical px for Win32, DIPs for WPF.
+
+## Handoff protocol (Claude ⇄ Codex)
+
+At the **end of every session** (or when you sense you're near your usage limit):
+1. Make sure it builds. If you must stop mid-change, leave it compiling (stub/feature-flag the rest).
+2. Append an entry to `docs/PROGRESS.md`: date, agent, what changed, what's verified vs not, and a
+   precise "Next up" list (file names + what to do).
+3. Tick/untick items in `docs/ROADMAP.md`.
+4. Commit only if the owner asked for commits; otherwise leave the changes for them to review and say so in PROGRESS.md.
+
+At the **start of a session**: read this file, then the latest PROGRESS.md entry, then ROADMAP.md.
