@@ -26,6 +26,7 @@ public static class Services
     static readonly Lazy<QuickSettingsService> _quick = new(() => new QuickSettingsService());
     static readonly Lazy<DataStore> _data = new(() => new DataStore());
     static readonly Lazy<IconCache> _icons = new(() => new IconCache());
+    static readonly Lazy<ApplicationJumpListService> _jump = new(() => new ApplicationJumpListService());
     static readonly Lazy<WindowTracker> _windows = new(() => new WindowTracker());
     static readonly Lazy<TaskbarController> _taskbar = new(() => new TaskbarController());
     static readonly Lazy<ClaudeConnector> _claude = new(() => new ClaudeConnector());
@@ -47,6 +48,7 @@ public static class Services
     public static QuickSettingsService Quick => _quick.Value;
     public static DataStore Data => _data.Value;
     public static IconCache Icons => _icons.Value;
+    public static ApplicationJumpListService JumpLists => _jump.Value;
     public static WindowTracker Windows => _windows.Value;
     public static TaskbarController Taskbar => _taskbar.Value;
     public static ClaudeConnector Claude => _claude.Value;

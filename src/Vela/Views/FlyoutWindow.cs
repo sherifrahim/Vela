@@ -25,6 +25,7 @@ public sealed class FlyoutWindow : GlassWindow
     public static void Toggle(FrameworkElement anchor, UIElement content, double width = 340)
     {
         if (Current != null && Current.Anchor == anchor) { Current.CloseAnimated(); return; }
+        WindowPreview.CloseAll();
         Current?.CloseNow();
         var f = new FlyoutWindow(anchor, content, width);
         Current = f;
@@ -73,6 +74,8 @@ public sealed class FlyoutWindow : GlassWindow
         _root.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         RegionElement = _root;
         Content = _root;
+        // Cards follow the light/dark look their dock adapted to.
+        if (DockWindow.For(anchor)?.AdaptiveResources is { } rd) Resources.MergedDictionaries.Add(rd);
 
         Deactivated += (_, _) => CloseAnimated();
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) CloseAnimated(); };

@@ -97,6 +97,10 @@ reference/lumabar/       original app's public README + screenshots (reference o
   shapes are anti-aliased geometry clips. The non-layered "WindowChrome glass" path renders **black** with a
   region. DWM blur/acrylic is **off** (on layered windows it fills the whole rectangle). The dock's glass is a
   pre-blurred wallpaper slice (`Theming/WallpaperGlass.cs`). Cards/panels are opaque. Details in ARCHITECTURE.md.
+- **Adaptive theme:** each dock merges a light or dark `ThemeManager.Variant` into its own `Resources`; anything
+  you open from a dock (cards, previews) should adopt `DockWindow.For(anchor).AdaptiveResources`.
+- **Third-party code:** `Shell/JumpLists.cs` is ported from OpenTaskbar (MIT) — keep its header and
+  `THIRD_PARTY_NOTICES.md`.
 - **Several displays:** `DockWindow.All` holds one dock per display; only `DockWindow.Instance` (primary) owns
   the taskbar, shell hook and windows. Use `DockWindow.For(element)` to reach the dock a widget lives in.
   Layout edits must go through `SaveWidgets()` so the other docks rebuild.

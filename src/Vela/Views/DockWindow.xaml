@@ -9,6 +9,8 @@
              Bar layers, bottom to top: Bar.Background (blurred wallpaper slice, glass styles only),
              Tint (style colour), Sheen (rim light), the item row. The bar is clipped to its rounded
              shape with an anti-aliased geometry (GlassWindow.UpdateRegion). -->
+        <!-- Auto-hide: a nearly invisible strip on the screen edge that brings the dock back when touched. -->
+        <Border x:Name="EdgeTrigger" Height="3" VerticalAlignment="Bottom" Background="#01000000" Visibility="Collapsed" />
         <Grid x:Name="BarHost" HorizontalAlignment="Stretch" VerticalAlignment="Bottom">
             <Border x:Name="Shadow" CornerRadius="16" IsHitTestVisible="False" Background="#66000000" Margin="1,1,1,-1">
                 <Border.Effect>

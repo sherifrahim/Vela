@@ -124,6 +124,30 @@ by WPF's size-to-content pass, which used to drop cards mid-screen), centred ove
 the bar edge, clamped to that display. `FlyoutWindow.Navigate(content)` swaps a card's content in place
 (Control Centre → Wi-Fi list). Memory is trimmed 4 s after the last card closes.
 
+**Live drag-and-drop** (`UI/LiveReorder`): the dragged widget / icon follows the pointer via its own
+TranslateTransform; when the order changes, neighbours glide to their new slots (FLIP: snapshot visual X →
+reorder → layout → animate the difference to 0, 170 ms). Used by `DockWindow` (widgets) and `AppsWidget` (pins).
+
+**Window previews** (`Views/WindowPreview`): hover a running app → after 420 ms a plain *non-layered* window
+(DWM thumbnails can't target layered windows) shows one card per window: icon, title, ✕, live
+`DwmRegisterThumbnail`. MA_NOACTIVATE so focus stays put; one shared instance follows the pointer between icons.
+
+**Jump lists** (`Shell/JumpLists.cs`, ported from OpenTaskbar, MIT): undocumented-but-stable Shell COM
+(IApplicationResolver, IApplicationDestinations/IAutomaticDestinationList) read on a dedicated STA thread;
+the app menu opens at once with "Loading…" and fills in Pinned / Recent / Frequent / Tasks.
+
+**Adaptive theme** (`Theming/AdaptiveBackdrop`, Settings.AdaptiveTheme, default on): each dock samples the
+strip of *its own* display just beside the bar (GDI StretchBlt HALFTONE → 240 px, off the UI thread), blurs +
+saturates it as the bar backdrop, and picks a light or dark resource set (`ThemeManager.Variant`) with
+hysteresis, merged into that dock's `Resources` (cards / previews opened from it adopt it). Triggers: foreground
+change, `Shell/ScreenEvents` (WinEvent move/resize/minimize, root windows only), 220 ms throttle, identical
+frames skipped, plus a 2.5 s heartbeat only while a window borders the dock. Never samples while a card or
+preview is open or the dock is hidden for fullscreen.
+
+**Auto-hide** (`Views/DockAutoHide`, Settings.AutoHide off|smart|always, adapted from OpenTaskbar): slides
+`BarHost` off the edge (200 ms); a 3 DIP `EdgeTrigger` strip brings it back; waits while hovered, menus/cards/
+previews are open, or you drag. Auto-hide releases the appbar reservation.
+
 **Magnification** (`AppsWidget`): per-frame (`CompositionTarget.Rendering`) easing toward a cosine falloff
 around the pointer measured in un-magnified slot units; slots widen so neighbours make room. The hook is
 removed as soon as icons settle, so it costs nothing at rest.

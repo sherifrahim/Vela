@@ -27,6 +27,9 @@ public sealed class AppSettings
     public string Displays { get; set; } = "all";     // all (a dock on every display) | primary
     public bool Magnification { get; set; } = true;   // macOS-style icon magnification on hover
     public double MagnifyAmount { get; set; } = 1.45; // largest icon scale (1.1–1.6)
+    public bool WindowPreviews { get; set; } = true;  // live thumbnails when hovering a running app
+    public bool AdaptiveTheme { get; set; } = true;   // each dock matches what is on its display (colours + light/dark)
+    public string AutoHide { get; set; } = "off";     // off | smart (hide when a window overlaps) | always
     public bool Use24Hour { get; set; }
     public bool TrackScreenTime { get; set; } = true;
 

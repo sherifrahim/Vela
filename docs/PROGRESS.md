@@ -4,6 +4,46 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-16 — Claude (Opus 5.5) — session 3: OpenTaskbar ideas, live drag, previews, jump lists, adaptive theme, auto-hide
+
+**Owner asks:** take the good parts of github.com/alztrk/opentaskbar (MIT); live drag-and-drop rearranging;
+the dock's look must follow what's on screen, per display.
+
+**Changed (uncommitted — owner hasn't asked for a commit this session)**
+- `UI/LiveReorder.cs`: live drag for widgets (`DockWindow`) and app icons (`AppsWidget`): item follows the
+  pointer, neighbours glide (FLIP, 170 ms).
+- `Views/WindowPreview.cs`: live DWM window previews on app hover (non-layered host window, click to switch,
+  ✕ to close); app tooltips suppressed for running apps; setting `WindowPreviews`.
+- `Shell/JumpLists.cs`: OpenTaskbar's native jump list reader, ported (MIT; `THIRD_PARTY_NOTICES.md`, copied into
+  `publish/` by `tools/publish.ps1`); app menus fill in Pinned/Recent/Frequent/Tasks asynchronously.
+- `Theming/AdaptiveBackdrop.cs` + `ThemeManager.Variant` + `Shell/ScreenEvents`: per-display adaptive look
+  (`AdaptiveTheme`, default on): glass = blurred strip of that display beside the bar; light/dark per dock.
+- `Views/DockAutoHide.cs`: auto-hide off/smart/always (`AutoHide`), edge trigger; releases the reservation.
+- Icons now extracted at 96 px (`IconCache.Get` default). Control panel: Match the screen, Auto-hide,
+  Live window previews.
+
+**Verified**
+- Builds 0 errors; no ERROR lines in vela.log.
+- Window preview for Claude: card with icon, title, ✕ and live thumbnail above the icon (magnified).
+- Jump list in Brave's menu (recent files with icons) above the window list.
+- Adaptive: display-2 dock sampled its screen and switched to the dark set (log "adapts to a dark screen").
+- Fullscreen: an Unreal Engine fullscreen app on display 1 hid only that dock (QUNS=3); display 2 unaffected.
+- Idle with two docks + adaptive heartbeat: 62 ms CPU / 20 s (~0.3 % of a core), WS 56 MB, private 140 MB.
+
+**Not verified** (owner was in a fullscreen app; no synthetic input sent after noticing)
+- Live drag feel (widgets + icons), auto-hide all modes, adaptive light switch (needs a bright app above the
+  dock), jump-list task invocation, preview ✕ close, 96 px icon sharpness.
+
+**Next up**
+1. Hand-test the list above; tune `LiveReorder` timings and `AdaptiveBackdrop` thresholds (0.42 / 0.62).
+2. `AdaptiveBackdrop`: consider sampling *behind* the bar when ReserveSpace is off or auto-hide is on
+   (needs `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` on the dock — but that hides the dock from the
+   owner's screenshots; make it opt-in).
+3. Jump-list icons for tasks (OpenTaskbar extracts resource icons via `PrivateExtractIcons`).
+4. Volume mixer card; per-display app filtering; magnified icons above the bar (see session 2 list).
+
+---
+
 ## 2026-11-15 — Claude (Opus 5.5) — session 2: reference proportions, full-width bar, cards, control centre, multi-display
 
 **Owner feedback this session:** dock looked "chunky / cheap knockoff", didn't span the screen, sat on top of

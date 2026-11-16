@@ -171,6 +171,8 @@ public sealed class SettingsWindow : GlassWindow
         Field("Widget tiles", Wrap(new[] { ("auto", "Match style"), ("black", "Black"), ("white", "White"), ("glass", "Glass") }
             .Select(x => Segment(x.Item2, "tiles", s.WidgetStyle == x.Item1, () => { s.WidgetStyle = x.Item1; Settings.Save("theme"); }))));
 
+        Toggle("Match the screen", "Each display's dock picks up the colours of what's open on that display and switches between light and dark to match.", s.AdaptiveTheme, v => { s.AdaptiveTheme = v; Settings.Save("adaptive"); });
+
         Section("Glass");
         Field("Effect", Wrap(new[] { ("auto", "Style default"), ("off", "Off (solid)"), ("frosted", "Frosted"), ("liquid", "Liquid Glass") }
             .Select(x => Segment(x.Item2, "glassfx", s.GlassEffect == x.Item1, () => { s.GlassEffect = x.Item1; Settings.Save("glass"); Rebuild(); }))),
@@ -191,6 +193,10 @@ public sealed class SettingsWindow : GlassWindow
         Field("Distance from screen edge", SliderRow(s.EdgeMargin, 0, 24, " px", v => { s.EdgeMargin = Math.Round(v); Settings.Save("dock"); }));
         Field("Spacing between widgets", SliderRow(s.Spacing, 0, 24, " px", v => { s.Spacing = Math.Round(v); Settings.Save("dock"); }));
         Toggle("Show desktop corner", "A sliver at the far end: hover to peek at the desktop, click to show it.", s.DesktopCorner, v => { s.DesktopCorner = v; Settings.Save("dock"); });
+        Field("Auto-hide", Wrap(new[] { ("off", "Off"), ("smart", "When a window overlaps"), ("always", "Always") }
+            .Select(x => Segment(x.Item2, "autohide", s.AutoHide == x.Item1, () => { s.AutoHide = x.Item1; Settings.Save("autohide"); }))),
+            "Hidden docks come back when the pointer touches the screen edge. Auto-hide gives the reserved space back to your windows.");
+        Toggle("Live window previews", "Hover a running app to see its windows; click one to switch, ✕ to close it.", s.WindowPreviews, v => { s.WindowPreviews = v; Settings.Save(); });
         Field("Displays", Wrap(new[] { ("all", "Every display"), ("primary", "Main display only") }
             .Select(x => Segment(x.Item2, "displays", s.Displays == x.Item1, () => { s.Displays = x.Item1; Settings.Save("displays"); }))),
             "With several monitors, each one gets its own dock with the same widgets.");

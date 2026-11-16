@@ -124,14 +124,33 @@ public static class ThemeManager
         var s = Settings.Current;
         Current = Palettes.Get(s.Theme);
         try { Accent = (Color)ColorConverter.ConvertFromString(s.Accent); } catch { }
-
-        var r = Application.Current.Resources;
-        var p = Current;
-        void B(string key, Color c) { var b = new SolidColorBrush(c); b.Freeze(); r[key] = b; }
-
-        // Glass effect: "auto" follows the style; off / frosted / liquid override it.
-        GlassOn = s.GlassEffect switch { "off" => false, "frosted" or "liquid" => true, _ => p.Backdrop != BackdropKind.None };
+        // Glass effect: "auto" follows the style; off / frosted / liquid override it. "Match the screen" implies glass.
+        GlassOn = s.AdaptiveTheme || s.GlassEffect switch { "off" => false, "frosted" or "liquid" => true, _ => Current.Backdrop != BackdropKind.None };
         Liquid = s.GlassEffect == "liquid";
+        _variants[0] = _variants[1] = null;
+        Fill(Application.Current.Resources, Current, s);
+        Changed?.Invoke();
+    }
+
+    static readonly ResourceDictionary?[] _variants = new ResourceDictionary?[2];
+
+    /// <summary>
+    /// A per-dock light or dark set of the theme brushes (adaptive mode: each display's dock follows what's
+    /// on its screen). Light uses the chosen style if it's light, else Frost Glass; dark the reverse with Liquid Glass.
+    /// </summary>
+    public static ResourceDictionary Variant(bool light)
+    {
+        int i = light ? 1 : 0;
+        if (_variants[i] is { } cached) return cached;
+        var p = light ? (Current.IsLight ? Current : Palettes.FrostGlass) : (Current.IsLight ? Palettes.LiquidGlass : Current);
+        var d = new ResourceDictionary();
+        Fill(d, p, Settings.Current);
+        return _variants[i] = d;
+    }
+
+    static void Fill(ResourceDictionary r, Palette p, AppSettings s)
+    {
+        void B(string key, Color c) { var b = new SolidColorBrush(c); b.Freeze(); r[key] = b; }
         var bar = p.Bar;
         if (GlassOn && bar.A > 0xC0) bar.A = p.IsLight ? (byte)0xB0 : (byte)0xA8;   // let the glass show through solid styles
         if (!GlassOn && bar.A < 0xF0) bar = Blend(bar, p.IsLight ? Colors.White : Color.FromRgb(0x10, 0x10, 0x12));
@@ -181,8 +200,6 @@ public static class ThemeManager
         B("Transparent", Colors.Transparent);
         r["Accent.Color"] = Accent;
         r["Theme.IsLight"] = p.IsLight;
-
-        Changed?.Invoke();
     }
 
     static (Color, Color, Color)? TileOverride(string style) => style switch

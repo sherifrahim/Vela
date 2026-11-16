@@ -26,7 +26,7 @@ public sealed class IconCache
     }
 
     /// <summary>Get an icon for an exe/lnk path or "shell:AppsFolder\AUMID". Callback runs on the UI thread.</summary>
-    public void Get(string parsingName, Action<ImageSource?> onReady, int size = 64)
+    public void Get(string parsingName, Action<ImageSource?> onReady, int size = 96)
     {
         if (string.IsNullOrEmpty(parsingName)) { onReady(null); return; }
         if (_cache.TryGetValue(parsingName, out var hit)) { onReady(hit); return; }

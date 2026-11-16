@@ -24,9 +24,11 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [~] Glass options: Frosted / Liquid Glass / blur strength / glass tiles (not visually checked yet)
 - [~] Desktop corner: hover = peek (undocumented DWM call), click = show desktop (peek not verified)
 - [~] Top edge + drag-to-snap (code done, not yet tested by hand)
-- [~] Fullscreen hide/restore (code done; test with a game / F11 video), now per display
+- [x] Fullscreen hide/restore per display — verified (Unreal Engine fullscreen on display 1 hid only that dock)
 - [ ] Tooltips should open *below* when the dock is on top (ToolTip style uses Placement=Top)
-- [ ] Auto-hide dock mode (slide away, reveal at edge, "show on desktop", Win key reveal)
+- [~] Auto-hide: off / smart (window overlaps) / always, edge trigger (code done; not hand-tested — owner was in a fullscreen app)
+- [~] Adaptive theme: each display's dock matches its screen (colours + light/dark) — verified dark on display 2
+- [~] Live drag-and-drop: dragged item follows the pointer, neighbours glide (code done, not hand-tested)
 - [ ] Magnified icons may grow above the bar (needs a taller transparent window band + clip changes)
 - [ ] Per-display app filtering ("show only windows on this display") for secondary docks
 - [ ] Lock dock setting
@@ -35,8 +37,8 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [x] Start button (click = Start, right-click = quick menu shortcuts), pinned apps imported from taskbar
 - [x] Running windows grouped by AUMID/exe, running dots, multi-window cycling, attention (flash) dot
 - [x] Context menu: window list, new window, pin/unpin, close
-- [ ] Live window previews on hover (DwmRegisterThumbnail into a card)
-- [ ] Jump lists (ICustomDestinationList / automatic destinations)
+- [x] Live window previews on hover (DWM thumbnails, click to switch, ✕ to close) — verified
+- [x] Jump lists (pinned / recent / frequent / tasks) in app menus — verified (Brave)
 - [ ] End task for hung windows (IsHungAppWindow)
 - [ ] App badges (unread counts) — needs notification access; investigate `UserNotificationListener` with a sparse package identity
 - [ ] Drag files/folders onto the dock to pin; drag files over an app to bring it forward

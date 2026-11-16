@@ -84,6 +84,10 @@ public partial class DockWindow : GlassWindow
         Closed += (_, _) =>
         {
             All.Remove(this);
+            if (_autoHideHooked && _autoHide != null) { Svc.Windows.ForegroundChanged -= _autoHide.Poke; ScreenEvents.Changed -= _autoHide.Poke; }
+            _adaptive?.Dispose();
+            Svc.Windows.ForegroundChanged -= PokeAdaptive;
+            ScreenEvents.Changed -= PokeAdaptive;
             ThemeManager.Changed -= ApplyLook;
             Settings.Changed -= OnSettingChanged;
             WallpaperGlass.Changed -= UpdateGlass;
@@ -116,6 +120,130 @@ public partial class DockWindow : GlassWindow
         if (Math.Abs(f - cur) < 0.005) return;
         Items.LayoutTransform = f >= 0.999 ? Transform.Identity : new ScaleTransform(f, f);
         if (f < 1) Log.Info($"Dock content scaled to {f:P0} to fit the screen");
+    }
+
+    // ------------------------------------------------------------------ auto-hide
+
+    DockAutoHide? _autoHide;
+    bool _autoHideHooked;
+    static int _openMenus;
+
+    static DockWindow()
+    {
+        EventManager.RegisterClassHandler(typeof(ContextMenu), ContextMenu.OpenedEvent, new RoutedEventHandler((_, _) => _openMenus++));
+        EventManager.RegisterClassHandler(typeof(ContextMenu), ContextMenu.ClosedEvent, new RoutedEventHandler((_, _) => _openMenus = Math.Max(0, _openMenus - 1)));
+    }
+
+    /// <summary>Dragging, reordering or a menu is open: auto-hide must wait.</summary>
+    public bool IsInteracting => _reordering || _barDragging || _openMenus > 0;
+
+    void SetupAutoHide()
+    {
+        if (_autoHide == null)
+        {
+            _autoHide = new DockAutoHide(this, BarHost);
+            _autoHide.HiddenChanged += hidden => EdgeTrigger.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
+            BarHost.MouseEnter += (_, _) => _autoHide.PointerArrived();
+            BarHost.MouseLeave += (_, _) => _autoHide.PointerLeft();
+            EdgeTrigger.MouseEnter += (_, _) => _autoHide.PointerArrived();
+        }
+        bool on = Settings.Current.AutoHide != "off";
+        if (on && !_autoHideHooked) { Svc.Windows.ForegroundChanged += _autoHide.Poke; ScreenEvents.Changed += _autoHide.Poke; _autoHideHooked = true; }
+        else if (!on && _autoHideHooked) { Svc.Windows.ForegroundChanged -= _autoHide.Poke; ScreenEvents.Changed -= _autoHide.Poke; _autoHideHooked = false; }
+        EdgeTrigger.VerticalAlignment = Settings.Current.Edge == "top" ? VerticalAlignment.Top : VerticalAlignment.Bottom;
+        _autoHide.Poke();
+        _autoHide.Evaluate();
+    }
+
+    // ------------------------------------------------------------------ match the screen (adaptive theme)
+
+    AdaptiveBackdrop? _adaptive;
+    Brush? _adaptiveBrush;
+    bool? _adaptiveLight;
+
+    /// <summary>The light/dark resource set this dock currently uses (cards opened from it adopt it too).</summary>
+    public ResourceDictionary? AdaptiveResources { get; private set; }
+
+    void SetupAdaptive()
+    {
+        bool on = Settings.Current.AdaptiveTheme;
+        if (!on)
+        {
+            if (_adaptive == null) return;
+            _adaptive.Dispose();
+            _adaptive = null;
+            Svc.Windows.ForegroundChanged -= PokeAdaptive;
+            ScreenEvents.Changed -= PokeAdaptive;
+            _adaptiveBrush = null;
+            _adaptiveLight = null;
+            AdaptiveResources = null;
+            Resources.MergedDictionaries.Clear();
+            UpdateGlass();
+            return;
+        }
+        if (_adaptive == null)
+        {
+            _adaptive = new AdaptiveBackdrop(AdaptiveStrip, OnAdaptiveSample);
+            Svc.Windows.ForegroundChanged += PokeAdaptive;
+            ScreenEvents.Changed += PokeAdaptive;
+        }
+        _adaptiveLight = null;     // theme changed: re-apply the variant on the next sample
+        PokeAdaptive();
+    }
+
+    void PokeAdaptive() => _adaptive?.Poke();
+
+    /// <summary>The strip of this display right next to the bar (above it, or below when docked at the top).</summary>
+    (RECT strip, bool active) AdaptiveStrip()
+    {
+        if (Environment.GetEnvironmentVariable("VELA_DEBUG_ADAPTIVE") == "1")
+            Log.Info($"adaptive? {_device} hwnd={Hwnd != IntPtr.Zero} fs={_fullscreenHidden} vis={IsVisible} loaded={Bar.IsLoaded} flyout={FlyoutWindow.Current != null} preview={WindowPreview.IsOpen}");
+        if (Hwnd == IntPtr.Zero || _fullscreenHidden || !IsVisible || !Bar.IsLoaded || FlyoutWindow.Current != null || WindowPreview.IsOpen)
+            return (default, false);
+        try
+        {
+            var tl = Bar.PointToScreen(new Point(0, 0));
+            var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
+            double dpi = VisualTreeHelper.GetDpi(this).DpiScaleY;
+            int h = (int)(36 * dpi), gap = (int)(TopGap * dpi) + 2;
+            bool top = Settings.Current.Edge == "top";
+            var r = new RECT
+            {
+                Left = (int)tl.X, Right = (int)br.X,
+                Top = top ? (int)br.Y + gap : (int)tl.Y - gap - h,
+                Bottom = top ? (int)br.Y + gap + h : (int)tl.Y - gap,
+            };
+            // Heartbeat only while a real window borders the dock on this display (its content can change silently).
+            var fg = GetForegroundWindow();
+            bool windowNearby = fg != IntPtr.Zero && !IsIconic(fg) && MonitorFromWindow(fg, 2) == MonitorFromWindow(Hwnd, 2)
+                && GetClassNameOf(fg) is not ("Progman" or "WorkerW") && GetWindowRect(fg, out var fr) && (top ? fr.Top <= r.Bottom : fr.Bottom >= r.Top);
+            _adaptive?.SetHeartbeat(windowNearby);
+            return (r, true);
+        }
+        catch (InvalidOperationException) { return (default, false); }
+    }
+
+    void OnAdaptiveSample(AdaptiveBackdrop.Sample s)
+    {
+        if (!Settings.Current.AdaptiveTheme) return;
+        var brush = new ImageBrush(s.Image) { Stretch = Stretch.Fill };
+        RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
+        brush.Freeze();
+        _adaptiveBrush = brush;
+        Bar.Background = brush;
+        // Hysteresis so a mid-grey window doesn't make the dock flicker between light and dark.
+        bool light = _adaptiveLight switch
+        {
+            null => s.Luminance > 0.55,
+            true => s.Luminance > 0.42,
+            false => s.Luminance > 0.62,
+        };
+        if (light == _adaptiveLight) return;
+        _adaptiveLight = light;
+        AdaptiveResources = ThemeManager.Variant(light);
+        Resources.MergedDictionaries.Clear();
+        Resources.MergedDictionaries.Add(AdaptiveResources);
+        Log.Info($"Dock {(IsPrimary ? "primary" : _device)} adapts to a {(light ? "light" : "dark")} screen (L={s.Luminance:0.00})");
     }
 
     // ------------------------------------------------------------------ peek / show desktop corner
@@ -178,6 +306,8 @@ public partial class DockWindow : GlassWindow
 
         BuildWidgets();
         ApplyLook();
+        SetupAdaptive();
+        SetupAutoHide();
         if (IsPrimary) Dispatcher.BeginInvoke(SyncDisplays, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
@@ -216,6 +346,7 @@ public partial class DockWindow : GlassWindow
 
     void ApplyLook()
     {
+        if (_adaptive != null) { _adaptiveLight = null; PokeAdaptive(); } // theme rebuilt: re-pick the light/dark variant
         double s = ThemeManager.SizeScale;
         _sizeScale.ScaleX = _sizeScale.ScaleY = s;
         RegionScale = s;
@@ -231,6 +362,11 @@ public partial class DockWindow : GlassWindow
     /// <summary>Line the blurred wallpaper slice up with the bar's current screen position.</summary>
     void UpdateGlass()
     {
+        if (Settings.Current.AdaptiveTheme)
+        {
+            PokeAdaptive();                                                  // re-sample after any move / resize
+            if (_adaptiveBrush != null) { Bar.Background = _adaptiveBrush; return; }
+        }
         if (Hwnd == IntPtr.Zero || !Bar.IsLoaded || !ThemeManager.GlassOn)
         {
             Bar.Background = null;
@@ -259,6 +395,8 @@ public partial class DockWindow : GlassWindow
         {
             case "theme": case "size": case "accent": ThemeManager.Apply(); break;
             case "glass": WallpaperGlass.Reload(); ThemeManager.Apply(); break;
+            case "adaptive": ThemeManager.Apply(); SetupAdaptive(); break;
+            case "autohide": QueueReposition(); SetupAutoHide(); break;
             case "dock": ApplyLook(); break;
             case "widgets": if (_origin != this && _origin != null || _origin == null && !IsPrimary) BuildWidgets(); break;
             case "displays": SyncDisplays(); break;
@@ -287,7 +425,8 @@ public partial class DockWindow : GlassWindow
 
         var rect = mi.rcMonitor;
         if (top) rect.Bottom = rect.Top + hPx; else rect.Top = rect.Bottom - hPx;
-        if (s.ReserveSpace) rect = _appBar.Reserve(mi.rcMonitor, top, hPx);
+        // Auto-hide gives the screen space back (the dock floats over windows and slides away).
+        if (s.ReserveSpace && s.AutoHide == "off") rect = _appBar.Reserve(mi.rcMonitor, top, hPx);
         else _appBar.Release(mi.rcMonitor, top);
 
         // Full width: the bar runs edge to edge with the same small inset on the sides as from the screen edge.
@@ -303,7 +442,7 @@ public partial class DockWindow : GlassWindow
         Dispatcher.BeginInvoke(UpdateGlass, System.Windows.Threading.DispatcherPriority.Loaded);
         // Windows that were maximized while the taskbar was hidden still cover the whole screen; fit them
         // to the new work area so the dock never sits on top of an app's own UI.
-        if (s.ReserveSpace) Dispatcher.BeginInvoke(() => WindowTracker.FitMaximizedToWorkArea(Hwnd), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        if (s.ReserveSpace && s.AutoHide == "off") Dispatcher.BeginInvoke(() => WindowTracker.FitMaximizedToWorkArea(Hwnd), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     // ------------------------------------------------------------------ widgets
@@ -493,14 +632,15 @@ public partial class DockWindow : GlassWindow
         if (WidgetBase.EditMode) { BeginReorder(); e.Handled = true; }
     }
 
+    Vela.UI.LiveReorder? _live;
+
     void BeginReorder()
     {
         if (_pressCandidate == null) return;
         _reorderItem = _pressCandidate;
         _reordering = true;
-        _reorderItem.Opacity = 0.8;
-        Panel.SetZIndex(_reorderItem, 10);
         FlyoutWindow.CloseCurrent();
+        _live = new Vela.UI.LiveReorder(Items, _reorderItem, _dragStart);
         Items.CaptureMouse();
     }
 
@@ -511,23 +651,9 @@ public partial class DockWindow : GlassWindow
             var q = e.GetPosition(Items);
             if (Math.Abs(q.X - _dragStart.X) > DragThreshold) BeginReorder();
         }
-        if (_reorderItem == null) return;
-        var p = e.GetPosition(Items);
-        int from = Items.Children.IndexOf(_reorderItem);
-        // New index = how many other items have their centre left of the pointer. Uses real positions,
-        // because DockRow spreads items across a full-width bar.
-        int target = 0;
-        foreach (FrameworkElement c in Items.Children)
-        {
-            if (c == _reorderItem) continue;
-            double mid = c.TranslatePoint(new Point(c.ActualWidth / 2, 0), Items).X;
-            if (p.X > mid) target++;
-        }
-        if (target != from)
-        {
-            Items.Children.RemoveAt(from);
-            Items.Children.Insert(target, _reorderItem);
-        }
+        if (_reorderItem == null || _live == null) return;
+        // Live: the widget follows the pointer, the others glide out of its way.
+        _live.Move(e.GetPosition(Items));
     }
 
     void OnItemsPreviewUp(object sender, MouseButtonEventArgs e)
@@ -535,8 +661,8 @@ public partial class DockWindow : GlassWindow
         _pressCandidate = null;
         if (_reorderItem == null) return;
         Items.ReleaseMouseCapture();
-        _reorderItem.Opacity = 1;
-        Panel.SetZIndex(_reorderItem, 0);
+        _live?.End();
+        _live = null;
         _reorderItem = null;
         _reordering = false;
         PersistOrder();

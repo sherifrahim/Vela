@@ -31,6 +31,7 @@ public sealed class AppsWidget : WidgetBase
     readonly Dictionary<string, AppItem> _items = new();
     List<Group> _groups = new();
     AppItem? _dragItem;
+    LiveReorder? _live;
     bool _dragging;
     Point _dragStart;
     readonly List<string> _runningOrder = new();
@@ -183,6 +184,13 @@ public sealed class AppsWidget : WidgetBase
             item.Clicked += () => OnItemClick(group, item);
             item.MiddleClicked += () => { if (group.LaunchPath != null) WindowTracker.Launch(group.LaunchPath); };
             item.MenuRequested += m => BuildMenu(m, group);
+            var key = g.Key;
+            item.HoverStarted += () =>
+            {
+                if (_dragging || IsPreview || group.Windows.Count == 0) return;
+                Views.WindowPreview.Hover(item, () => (IReadOnlyList<AppWindow>?)_groups.FirstOrDefault(x => x.Key == key)?.Windows ?? Array.Empty<AppWindow>(), item.Icon);
+            };
+            item.HoverEnded += Views.WindowPreview.Leave;
             _panel.Children.Add(item);
         }
         UpdateActive();
@@ -200,6 +208,7 @@ public sealed class AppsWidget : WidgetBase
 
     void OnItemClick(Group g, AppItem item)
     {
+        Views.WindowPreview.CloseAll();
         if (g.Windows.Count == 0)
         {
             if (g.LaunchPath == null) return;
@@ -216,6 +225,7 @@ public sealed class AppsWidget : WidgetBase
 
     void BuildMenu(ContextMenu m, Group g)
     {
+        AddJumpList(m, g);
         foreach (var w in g.Windows)
         {
             var title = w.Title.Length > 48 ? w.Title[..48] + "…" : w.Title;
@@ -238,6 +248,46 @@ public sealed class AppsWidget : WidgetBase
         m.Items.Add(new Separator());
         m.Items.Add(Item("Widgets…", () => Views.DockWindow.Instance?.OpenWidgetPicker()));
         m.Items.Add(Item("Settings", () => Views.DockWindow.Instance?.OpenSettings()));
+    }
+
+    // ---------- jump lists (recent / frequent / tasks), filled in while the menu is already open ----------
+
+    static void AddJumpList(ContextMenu m, Group g)
+    {
+        var hwnd = g.Windows.FirstOrDefault()?.Hwnd ?? IntPtr.Zero;
+        var shortcut = hwnd == IntPtr.Zero ? g.LaunchPath : null;
+        if (hwnd == IntPtr.Zero && string.IsNullOrEmpty(shortcut)) return;
+        var loading = new MenuItem { Header = "Loading…", IsEnabled = false };
+        var sep = new Separator();
+        m.Items.Insert(0, loading);
+        m.Items.Insert(1, sep);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        m.Closed += (_, _) => cts.Cancel();
+        _ = Fill();
+
+        async Task Fill()
+        {
+            ApplicationJumpList? list = null;
+            try { list = await Svc.JumpLists.ReadAsync(hwnd, shortcut, cts.Token); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Log.Warn("Jump list: " + ex.Message); }
+            int at = m.Items.IndexOf(loading);
+            if (at < 0) return;
+            m.Items.Remove(loading);
+            if (list is not { Status: JumpListStatus.Ready }) { m.Items.Remove(sep); return; }
+            foreach (var group in list.Groups)
+            {
+                m.Items.Insert(at++, new MenuItem { Header = group.Title, IsEnabled = false, FontWeight = FontWeights.SemiBold });
+                foreach (var e in group.Entries.Where(e => !e.IsSeparator).Take(8))
+                {
+                    var entry = e;
+                    var mi = new MenuItem { Header = e.Title.Length > 52 ? e.Title[..52] + "…" : e.Title };
+                    if (e.Icon != null) mi.Icon = new Image { Source = e.Icon, Width = 16, Height = 16 };
+                    mi.Click += (_, _) => _ = Svc.JumpLists.InvokeAsync(list.SessionId, entry.CommandId, Views.DockWindow.Instance?.WindowHandle ?? IntPtr.Zero);
+                    m.Items.Insert(at++, mi);
+                }
+            }
+        }
     }
 
     // ---------- macOS-style magnification ----------
@@ -316,17 +366,15 @@ public sealed class AppsWidget : WidgetBase
         {
             if (Math.Abs(p.X - _dragStart.X) < 7) return;
             _dragging = true;
-            _dragItem.Opacity = 0.7;
+            Views.WindowPreview.CloseAll();
+            // Settle any magnification first so slots have their resting widths while reordering.
+            foreach (var it in _panel.Children.OfType<AppItem>()) it.Magnify(1);
+            _magHover = false;
+            _panel.UpdateLayout();
+            _live = new LiveReorder(_panel, _dragItem, _dragStart);
             _panel.CaptureMouse();
         }
-        int from = _panel.Children.IndexOf(_dragItem), target = 1; // 0 = Start, never moves
-        for (int i = 1; i < _panel.Children.Count; i++)
-        {
-            var c = (FrameworkElement)_panel.Children[i];
-            if (c == _dragItem) continue;
-            if (p.X > c.TranslatePoint(new Point(c.ActualWidth / 2, 0), _panel).X) target++;
-        }
-        if (target != from) { _panel.Children.RemoveAt(from); _panel.Children.Insert(target, _dragItem); }
+        _live?.Move(p, minIndex: 1); // 0 = Start, never moves
     }
 
     void OnPanelUp(object sender, MouseButtonEventArgs e)
@@ -336,7 +384,8 @@ public sealed class AppsWidget : WidgetBase
         if (!_dragging || item == null) return;
         _dragging = false;
         _panel.ReleaseMouseCapture();
-        item.Opacity = 1;
+        _live?.End();
+        _live = null;
         e.Handled = true;
 
         var order = _panel.Children.OfType<AppItem>().Skip(1).Select(i => i.Key).ToList();
@@ -374,6 +423,10 @@ public sealed class AppItem : Grid
     public event Action? Clicked;
     public event Action? MiddleClicked;
     public event Action<ContextMenu>? MenuRequested;
+    public event Action? HoverStarted;
+    public event Action? HoverEnded;
+    /// <summary>The app icon currently shown (for previews / menus).</summary>
+    public ImageSource? Icon => (_content.Content as Image)?.Source;
 
     public AppItem(string? key)
     {
@@ -397,17 +450,18 @@ public sealed class AppItem : Grid
         ContextMenu = new ContextMenu();
         ToolTipService.SetInitialShowDelay(this, 350);
 
-        MouseEnter += (_, _) => Hover(true);
-        MouseLeave += (_, _) => Hover(false);
+        MouseEnter += (_, _) => { Hover(true); HoverStarted?.Invoke(); };
+        MouseLeave += (_, _) => { Hover(false); HoverEnded?.Invoke(); };
     }
 
     public void SetContent(UIElement e) => _content.Content = e;
 
-    public void ClearHandlers() { Clicked = null; MiddleClicked = null; MenuRequested = null; }
+    public void ClearHandlers() { Clicked = null; MiddleClicked = null; MenuRequested = null; HoverStarted = null; HoverEnded = null; }
 
     public void Bind(string name, int windows, bool flashing)
     {
-        ToolTip = Settings.Current.ShowAppNames ? name : null;
+        // Running apps show live previews (with titles) instead of a tooltip.
+        ToolTip = Settings.Current.ShowAppNames && (windows == 0 || !Settings.Current.WindowPreviews) ? name : null;
         _dot.Visibility = windows > 0 ? Visibility.Visible : Visibility.Collapsed;
         _dot.Width = windows > 1 ? 8 : 3;
         _dot.Bg(flashing ? "Sys.Orange" : "Accent");

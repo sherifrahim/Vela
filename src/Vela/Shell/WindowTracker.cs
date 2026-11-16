@@ -205,3 +205,48 @@ public sealed class WindowTracker
         catch (Exception ex) { Log.Error("FitMaximizedToWorkArea", ex); }
     }
 }
+
+/// <summary>
+/// One out-of-context WinEvent hook for "something moved on screen" (window move / resize / minimize / restore,
+/// top-level windows only). Consumers (adaptive docks) throttle on their side. Hooked lazily, unhooked when unused.
+/// </summary>
+public static class ScreenEvents
+{
+    delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint tid, uint flags);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
+    const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B, EVENT_SYSTEM_MINIMIZEEND = 0x0017, EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+
+    static readonly WinEventProc Proc = OnEvent; // kept alive for the native side
+    static IntPtr _move, _loc;
+    static Action? _changed;
+
+    public static event Action? Changed
+    {
+        add
+        {
+            bool first = _changed == null;
+            _changed += value;
+            if (!first) return;
+            _move = SetWinEventHook(EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MINIMIZEEND, IntPtr.Zero, Proc, 0, 0, 0 /*OUTOFCONTEXT*/);
+            _loc = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, Proc, 0, 0, 0);
+        }
+        remove
+        {
+            _changed -= value;
+            if (_changed != null) return;
+            if (_move != IntPtr.Zero) UnhookWinEvent(_move);
+            if (_loc != IntPtr.Zero) UnhookWinEvent(_loc);
+            _move = _loc = IntPtr.Zero;
+        }
+    }
+
+    static void OnEvent(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
+    {
+        if (idObject != 0 || idChild != 0 || hwnd == IntPtr.Zero) return; // OBJID_WINDOW of a window, not carets/cursors
+        if (ev == EVENT_OBJECT_LOCATIONCHANGE && GetAncestor(hwnd, 2 /*GA_ROOT*/) != hwnd) return;
+        _changed?.Invoke();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+}

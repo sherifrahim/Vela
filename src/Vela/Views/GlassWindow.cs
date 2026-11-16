@@ -21,6 +21,7 @@ namespace Vela.Views;
 public class GlassWindow : Window
 {
     protected IntPtr Hwnd { get; private set; }
+    public IntPtr WindowHandle => Hwnd;
     /// <summary>Element whose rounded bounds define the visible window shape. Null = whole window.</summary>
     public FrameworkElement? RegionElement { get; set; }
     /// <summary>Corner radius of the region in DIPs (before <see cref="RegionScale"/>).</summary>
