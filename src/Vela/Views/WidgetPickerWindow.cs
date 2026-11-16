@@ -45,6 +45,7 @@ public sealed class WidgetPickerWindow : GlassWindow
         root.Bg("Flyout.Background");
         root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
         RegionElement = root;
+        LiveBackdrop = true;
 
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });

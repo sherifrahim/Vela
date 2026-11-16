@@ -96,7 +96,7 @@ Todo, roughly by value:
 - [ ] Global hotkeys: Alt+T todos, Win+T apps
 
 ## Engineering
-- [ ] Unit tests (xUnit) for pure logic: Claude/Codex log parsing, Fmt, WallpaperGlass mapping, Stripe summing
+- [x] Unit tests (xUnit, `tests/Vela.Tests`, 14 tests) + `tools/smoke.ps1` — by Codex, session 5
 - [x] Settings migration framework (`Settings.Migrate`, `AppSettings.Version` = 2)
 - [ ] App icon (.ico) + version resource; MSIX or Inno Setup installer; auto-start toggle verified
 - [ ] Multi-monitor: choose display; per-monitor DPI changes while running

@@ -73,11 +73,20 @@ public sealed class FlyoutWindow : GlassWindow
         _root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
         _root.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         RegionElement = _root;
+        LiveBackdrop = true; // frosted, macOS-style card over a live blur
         Content = _root;
         // Cards follow the light/dark look their dock adapted to.
         if (DockWindow.For(anchor)?.AdaptiveResources is { } rd) Resources.MergedDictionaries.Add(rd);
 
-        Deactivated += (_, _) => CloseAnimated();
+        // Close when another app takes focus. If one of Vela's own blur backdrops grabbed it (they sit right
+        // under the card), take it straight back instead of closing.
+        Deactivated += (_, _) => Dispatcher.BeginInvoke(() =>
+        {
+            if (_closing) return;
+            var fg = GetForegroundWindow();
+            if (fg != IntPtr.Zero && GetWindowTitle(fg) == "Vela Backdrop") { Activate(); return; }
+            CloseAnimated();
+        }, System.Windows.Threading.DispatcherPriority.Input);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) CloseAnimated(); };
         SizeChanged += (_, _) => Position();
         Loaded += (_, _) => { Position(); Animate(true); };
@@ -142,7 +151,8 @@ public sealed class FlyoutWindow : GlassWindow
         var ease = new CubicEase { EasingMode = open ? EasingMode.EaseOut : EasingMode.EaseIn };
         _root.BeginAnimation(OpacityProperty, new DoubleAnimation(open ? 0 : 1, open ? 1 : 0, dur) { EasingFunction = ease });
         var slide = new DoubleAnimation(open ? from : 0, open ? 0 : from, dur) { EasingFunction = ease };
-        if (!open) slide.Completed += (_, _) => CloseNow();
+        if (!open) { HideLiveBackdrop(); slide.Completed += (_, _) => CloseNow(); }
+        else slide.Completed += (_, _) => Dispatcher.BeginInvoke(SyncLiveBackdrop); // after the render pass: blur follows once the slide settles
         _slide.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 

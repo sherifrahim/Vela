@@ -72,7 +72,7 @@ public sealed class AppsWidget : WidgetBase
         {
             Settings.Current.PinnedApps = TaskbarPins.Read();
             Settings.Current.PinnedImported = true;
-            Settings.Save();
+            Settings.Save("pins");
         }
         Svc.Windows.Changed += Rebuild;
         Svc.Windows.ForegroundChanged += UpdateActive;
@@ -90,7 +90,14 @@ public sealed class AppsWidget : WidgetBase
         if (_magRunning) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
     }
 
-    void OnSettings(string what) { if (what == "pins") { _items.Clear(); Rebuild(); } } // fresh items (e.g. tile style changed)
+    void OnSettings(string what)
+    {
+        if (what is not ("pins" or "apps")) return;
+        _items.Clear(); // fresh controls: tile style and tooltip/preview policy are constructor/bind state
+        if (!Settings.Current.Magnification) _magHover = false;
+        Rebuild();
+        StartMag();
+    }
 
     void OnTheme() { foreach (var c in _panel.Children.OfType<AppItem>()) c.InvalidateVisualTree(); }
 
@@ -243,14 +250,13 @@ public sealed class AppsWidget : WidgetBase
         if (g.Windows.Count > 0) m.Items.Add(new Separator());
         if (g.LaunchPath != null) m.Items.Add(Item(g.Windows.Count > 0 ? "New window" : "Open", () => WindowTracker.Launch(g.LaunchPath)));
         if (g.Pin != null)
-            m.Items.Add(Item("Unpin from dock", () => { Settings.Current.PinnedApps.Remove(g.Pin); Settings.Save(); Rebuild(); }));
+            m.Items.Add(Item("Unpin from dock", () => { Settings.Current.PinnedApps.Remove(g.Pin); Settings.Save("pins"); }));
         else if (g.LaunchPath != null && g.Windows.Count > 0)
             m.Items.Add(Item("Pin to dock", () =>
             {
                 var w = g.Windows[0];
                 Settings.Current.PinnedApps.Add(new PinnedApp { Name = g.Name, LaunchPath = g.LaunchPath, TargetPath = w.ExePath, Aumid = w.Aumid });
-                Settings.Save();
-                Rebuild();
+                Settings.Save("pins");
             }));
         if (g.Windows.Count > 0)
             m.Items.Add(Item(g.Windows.Count > 1 ? "Close all windows" : "Close window", () => { foreach (var w in g.Windows) WindowTracker.Close(w.Hwnd); }));
@@ -306,7 +312,10 @@ public sealed class AppsWidget : WidgetBase
 
     double _mouseSlot = -100;
     bool _magHover, _magRunning;
+    readonly Stopwatch _magClock = Stopwatch.StartNew();
+    double _lastMagFrame;
     const double MagRange = 2.6; // how many neighbours (each side) grow with the hovered icon
+    const double MagResponse = 0.055; // seconds; independent of the display's refresh rate
 
     void OnMagMove(object sender, MouseEventArgs e)
     {
@@ -329,24 +338,30 @@ public sealed class AppsWidget : WidgetBase
     {
         if (_magRunning) return;
         _magRunning = true;
+        _lastMagFrame = _magClock.Elapsed.TotalSeconds;
         CompositionTarget.Rendering += MagFrame;
     }
 
     void MagFrame(object? sender, EventArgs e)
     {
+        double now = _magClock.Elapsed.TotalSeconds;
+        double elapsed = Math.Clamp(now - _lastMagFrame, 0, 0.05);
+        _lastMagFrame = now;
+        double blend = 1 - Math.Exp(-elapsed / MagResponse);
+        bool enabled = Settings.Current.Magnification;
         double max = Math.Clamp(Settings.Current.MagnifyAmount, 1.05, 1.6);
         bool settled = true;
         int i = 0;
         foreach (var it in _panel.Children.OfType<AppItem>())
         {
             double d = Math.Abs(i + 0.5 - _mouseSlot) / MagRange;
-            double target = _magHover && d < 1 ? 1 + (max - 1) * Math.Cos(d * Math.PI / 2) : 1;
-            double cur = it.Magnification, next = cur + (target - cur) * 0.28;
+            double target = enabled && _magHover && d < 1 ? 1 + (max - 1) * Math.Cos(d * Math.PI / 2) : 1;
+            double cur = it.Magnification, next = cur + (target - cur) * blend;
             if (Math.Abs(target - next) < 0.003) next = target; else settled = false;
             if (Math.Abs(next - cur) > 0.0005) it.Magnify(next);
             i++;
         }
-        if (settled && !_magHover) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
+        if (settled) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
     }
 
     // ---------- drag icons to reorder pins (dropping a running app among them pins it) ----------
@@ -412,8 +427,7 @@ public sealed class AppsWidget : WidgetBase
             }
         }
         Settings.Current.PinnedApps = pins;
-        Settings.Save();
-        Rebuild();
+        Settings.Save("pins");
     }
 }
 

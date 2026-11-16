@@ -37,7 +37,7 @@ internal sealed class AdaptiveBackdrop : IDisposable
     readonly DispatcherTimer _throttle = new() { Interval = TimeSpan.FromMilliseconds(220) };
     readonly DispatcherTimer _heartbeat = new() { Interval = TimeSpan.FromSeconds(2.5) };
     bool _busy, _pending, _disposed;
-    long _lastHash;
+    ulong _lastHash;
 
     /// <param name="where">Strip to sample in physical px, and whether sampling is allowed right now.</param>
     public AdaptiveBackdrop(Func<(Native.RECT strip, bool active)> where, Action<Sample> onSample)
@@ -99,8 +99,9 @@ internal sealed class AdaptiveBackdrop : IDisposable
             Marshal.Copy(bits, px, 0, px.Length);
 
             // Skip identical frames (heartbeat over a static window).
-            long hash = 17;
-            for (int i = 0; i < px.Length; i += 64) hash = hash * 31 + px[i];
+            // FNV-1a over every colour byte of every 4th pixel (all channels: a red→green change must count).
+            ulong hash = 14695981039346656037;
+            for (int i = 0; i < px.Length; i += 16) { hash = (hash ^ px[i]) * 1099511628211; hash = (hash ^ px[i + 1]) * 1099511628211; hash = (hash ^ px[i + 2]) * 1099511628211; }
             if (hash == _lastHash) return null;
             _lastHash = hash;
 

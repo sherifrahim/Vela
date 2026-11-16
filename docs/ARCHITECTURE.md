@@ -34,6 +34,16 @@ Every surface derives from `Views/GlassWindow`:
   as soon as a window region exists (DWM drops the glass sheet for regioned windows). Would need
   "no region + window sized exactly to the bar + DWM rounded corners" to be usable.
 
+**Live blur (default, `LiveBlur`):** `Views/BackdropWindow` is a separate *non-layered*, borderless, non-activating
+window per dock, placed exactly under the bar (z-order right below its dock, rounded region inset 1 px so the
+aliased edge hides under the bar's anti-aliased rim) with the **accent-policy Acrylic** (state 4, flags 0, tint
+0x01000000, dark mode). DWM blurs whatever is behind it live, on the GPU. Tested alternatives: Win11 system
+backdrop (DWMSBT_TRANSIENTWINDOW) renders flat grey because a dock is never the active window; accent flags 2 and
+plain blur-behind render black. `Vela.exe --blur-test` re-runs that comparison on the second display.
+The dock then paints only its 40 % tint, shading and tiles over it (`Bar.Background` = null).
+Our own window moves are ignored by `Shell/ScreenEvents` (else repositioning the backdrop feeds back into
+the adaptive sampler — that loop once cost 6 % CPU).
+
 **Glass:** DWM accent blur/acrylic is disabled in layered mode because DWM blurs the whole window
 rectangle regardless of the region (visible as black/blurred square corners). Instead the dock paints
 `WallpaperGlass`: the wallpaper decoded at 120–560 px wide (Settings → Glass → Blur strength), box-blurred once on the CPU
@@ -43,8 +53,12 @@ solid-colour desktops too). Recomputed on bar move/resize and on `WM_SETTINGCHAN
 Limitation: windows dragged *behind* the dock aren't reflected. Live refraction = roadmap
 (Windows.Graphics.Capture → D3D11 shader, only while something moves, like the original).
 
-Cards / picker / settings use opaque fills (`Flyout.Background`): a translucent panel that can't blur
-what's behind it just shows readable text through it, which looks cheap.
+Cards / picker / settings are frosted panels while `LiveBlur` is on: `GlassWindow.LiveBackdrop = true` places a
+`BackdropWindow` under `RegionElement` (re-synced after layout/moves, deferred with `Dispatcher.BeginInvoke`; cards
+sync once their slide-in settles and hide it before sliding out) and `Flyout.Background` drops to ~77 % alpha.
+With `LiveBlur` off the fills are opaque: a translucent panel that can't blur just shows text through it.
+Focus caveat: backdrops are never `Show()`n (`EnsureHandle` + `SWP_NOACTIVATE`); a card that loses focus to a
+"Vela Backdrop" window re-activates instead of closing.
 
 **Glass setting** (`AppSettings.GlassEffect`): `auto` = style default, `off` = solid bar, `frosted` = wallpaper
 glass on any style, `liquid` = frosted + specular rim (`Rim` border, `Bar.Rim` brush) + stronger top glow

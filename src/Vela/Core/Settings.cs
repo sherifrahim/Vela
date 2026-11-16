@@ -14,6 +14,7 @@ public sealed class AppSettings
     public string GlassEffect { get; set; } = "auto"; // auto (style decides) | off | frosted | liquid
     public double GlassBlur { get; set; } = 50;       // 0–100: how blurred the background under the bar is
     public bool GlassTiles { get; set; }               // tiles become frosted glass too (component blur)
+    public bool LiveBlur { get; set; } = true;         // real-time blur of whatever is behind the bar (DWM Acrylic, GPU)
 
     // Dock
     public string Edge { get; set; } = "bottom";      // bottom | top

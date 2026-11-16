@@ -50,7 +50,8 @@ touches the screen or the taskbar, so it works even while the owner is gaming). 
 `tools/screenshot.ps1 -Out shot.png -CropBottom 140` captures the dock strip; `tools/vela-windows.ps1`
 lists Vela's windows, rects and clip regions. Logs: `%LOCALAPPDATA%\Vela\logs\vela.log`.
 
-There is no unit-test project yet (see ROADMAP "Engineering"). "Done" currently means: builds with
+Tests: `dotnet test tests/Vela.Tests` (xUnit, pure logic; quit the dock first, it rebuilds Vela.exe).
+`tools/smoke.ps1` runs start → render → quit → marker/log checks (refuses while an owner dock is running). "Done" means: builds with
 0 errors, the dock starts, the change is visible in a screenshot, `vela.log` has no new ERROR lines, and
 `Vela.exe --quit` still logs "Vela stopped cleanly".
 
@@ -97,10 +98,17 @@ reference/lumabar/       original app's public README + screenshots (reference o
 
 ## Known gotchas (learned the hard way)
 
+- **Live blur:** the dock's glass is a separate non-layered `BackdropWindow` under each bar (accent Acrylic). Keep it
+  directly below its dock in z-order and hide it in fullscreen / auto-hide. System backdrops (Mica/Acrylic) do NOT work
+  for a dock (never active → flat grey).
 - **Rendering:** windows are *layered* (`AllowsTransparency=true`) with **no** Win32 region (aliased corners);
   shapes are anti-aliased geometry clips. The non-layered "WindowChrome glass" path renders **black** with a
   region. DWM blur/acrylic is **off** (on layered windows it fills the whole rectangle). The dock's glass is a
-  pre-blurred wallpaper slice (`Theming/WallpaperGlass.cs`). Cards/panels are opaque. Details in ARCHITECTURE.md.
+  live-blur `BackdropWindow` (falls back to the pre-blurred wallpaper slice). Cards, picker and control panel are
+  frosted glass over their own `BackdropWindow` (`GlassWindow.LiveBackdrop`). Details in ARCHITECTURE.md.
+- **Backdrop windows and focus:** never `Show()` a `BackdropWindow` (it can take activation and close the card above
+  it); `Place()` uses `EnsureHandle` + `SWP_NOACTIVATE`, and `FlyoutWindow` re-activates itself if a "Vela Backdrop"
+  window still grabs focus. Create them outside render/layout callbacks (defer with `Dispatcher.BeginInvoke`).
 - **Adaptive theme:** each dock merges a light or dark `ThemeManager.Variant` into its own `Resources`; anything
   you open from a dock (cards, previews) should adopt `DockWindow.For(anchor).AdaptiveResources`.
 - **Third-party code:** `Shell/JumpLists.cs` is ported from OpenTaskbar (MIT) — keep its header and

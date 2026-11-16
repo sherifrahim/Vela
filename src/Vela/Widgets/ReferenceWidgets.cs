@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -233,9 +232,9 @@ public sealed class WorldClocksWidget : WidgetBase
 
     string[] Selected => Cfg("cities", "NYC,LON,TYO").Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-    protected override UIElement BuildContent() { Build(); return _row; }
+    protected override UIElement BuildContent() { BuildClocks(); return _row; }
 
-    void Build()
+    void BuildClocks()
     {
         _row.Children.Clear(); _clocks.Clear();
         foreach (var code in Selected.Take(4))
@@ -272,7 +271,7 @@ public sealed class WorldClocksWidget : WidgetBase
             {
                 if (sel.Contains(code)) sel.Remove(code); else if (sel.Count < 4) sel.Add(code);
                 SetCfg("cities", string.Join(',', sel));
-                Build();
+                BuildClocks();
             }, sel.Contains(code)));
     }
 }
@@ -282,9 +281,7 @@ public sealed class TopProcessesWidget : WidgetBase
 {
     readonly bool _cpu;
     readonly StackPanel _rows = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 150 };
-    bool _busy;
     public TopProcessesWidget(bool cpu) => _cpu = cpu;
-    protected override int TickSeconds => 10;
 
     protected override UIElement BuildContent()
     {
@@ -292,77 +289,117 @@ public sealed class TopProcessesWidget : WidgetBase
         return _rows;
     }
 
-    protected override async void OnTick(DateTime now)
+    protected override void OnAttach()
+    {
+        Svc.TopProcesses.Updated += Render;
+        Render();
+    }
+
+    protected override void OnDetach() => Svc.TopProcesses.Updated -= Render;
+
+    void Render()
+    {
+        var top = _cpu ? Svc.TopProcesses.ByCpu : Svc.TopProcesses.ByRam;
+        if (top.Count == 0) return;
+        _rows.Children.Clear();
+        foreach (var process in top)
+        {
+            var icon = new Image { Width = 9, Height = 9, Margin = new Thickness(0, 0, 5, 0) };
+            if (process.Path != null) Svc.Icons.Get(process.Path, src => icon.Source = src, 32);
+            var name = Text(process.Name, 7.75, FontWeights.SemiBold);
+            name.MaxWidth = 92;
+            var value = Text(_cpu ? $"{process.Cpu:0.0}%" : Fmt.Bytes(process.Memory), 7.75, FontWeights.SemiBold).Right();
+            _rows.Children.Add(Columns("auto,*,auto", icon, name, value.Margin(8, 0, 0, 0)).Margin(0, 0.5, 0, 0.5));
+        }
+    }
+
+    protected override void OnClick() => WinActions.OpenTaskManager();
+}
+
+sealed record DownloadEntry(string FullName, string Name, DateTime LastWriteTime);
+
+/// <summary>One asynchronous Downloads snapshot shared by every display.</summary>
+static class DownloadsSnapshot
+{
+    sealed record Snapshot(string Folder, IReadOnlyList<DownloadEntry> Entries, int Today);
+
+    static Action? _changed;
+    static int _seconds;
+    static bool _busy;
+
+    public static string Folder { get; private set; } = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+    public static IReadOnlyList<DownloadEntry> Entries { get; private set; } = Array.Empty<DownloadEntry>();
+    public static int Today { get; private set; }
+    public static bool Ready { get; private set; }
+
+    public static event Action? Changed
+    {
+        add
+        {
+            bool first = _changed == null;
+            _changed += value;
+            if (first) { _seconds = 0; Svc.Ticker.Tick += OnTick; Refresh(); }
+        }
+        remove
+        {
+            _changed -= value;
+            if (_changed == null) Svc.Ticker.Tick -= OnTick;
+        }
+    }
+
+    static void OnTick(DateTime _)
+    {
+        if (++_seconds < 30) return;
+        _seconds = 0;
+        Refresh();
+    }
+
+    static async void Refresh()
     {
         if (_busy) return;
         _busy = true;
         try
         {
-            var top = await Task.Run(() => Sample(_cpu));
-            _rows.Children.Clear();
-            foreach (var p in top)
-            {
-                var icon = new Image { Width = 9, Height = 9, Margin = new Thickness(0, 0, 5, 0) };
-                if (p.path != null) Svc.Icons.Get(p.path, src => icon.Source = src, 32);
-                var name = Text(p.name, 7.75, FontWeights.SemiBold);
-                name.MaxWidth = 92;
-                var value = Text(_cpu ? $"{p.cpu:0.0}%" : Fmt.Bytes(p.mem), 7.75, FontWeights.SemiBold).Right();
-                _rows.Children.Add(Columns("auto,*,auto", icon, name, value.Margin(8, 0, 0, 0)).Margin(0, 0.5, 0, 0.5));
-            }
+            var snapshot = await Task.Run(Capture);
+            Folder = snapshot.Folder;
+            Entries = snapshot.Entries;
+            Today = snapshot.Today;
+            Ready = true;
+            _changed?.Invoke();
         }
-        catch (Exception ex) { Log.Warn("Top processes: " + ex.Message); }
+        catch (Exception ex) { Log.Warn("Downloads snapshot: " + ex.Message); }
         finally { _busy = false; }
     }
 
-    static readonly Dictionary<int, TimeSpan> LastCpu = new();
-    static readonly Dictionary<int, string?> PidPath = new(); // MainModule is slow; a pid's exe never changes
-    static DateTime _lastAt;
-
-    /// <summary>CPU % since the previous sample (all cores = 100 %), grouped by friendly app name.</summary>
-    static List<(string name, string? path, double cpu, long mem)> Sample(bool byCpu)
+    static Snapshot Capture()
     {
-        var now = DateTime.UtcNow;
-        double wall = Math.Max(1, (now - _lastAt).TotalMilliseconds) * Environment.ProcessorCount;
-        var rows = new List<(string name, string? path, double cpu, long mem)>();
-        var seen = new Dictionary<int, TimeSpan>();
-        foreach (var p in Process.GetProcesses())
+        string folder = ResolveFolder();
+        try
         {
-            try
-            {
-                if (p.Id == 0) continue;
-                var t = p.TotalProcessorTime;
-                seen[p.Id] = t;
-                double cpu = LastCpu.TryGetValue(p.Id, out var o) && _lastAt != default ? (t - o).TotalMilliseconds / wall * 100 : 0;
-                if (!PidPath.TryGetValue(p.Id, out var path))
-                {
-                    try { path = p.MainModule?.FileName; } catch { }
-                    PidPath[p.Id] = path;
-                }
-                rows.Add((Friendly(p, path), path, cpu, p.WorkingSet64));
-            }
-            catch { }
-            finally { p.Dispose(); }
+            var files = new DirectoryInfo(folder).EnumerateFileSystemInfos()
+                .Where(f => (f.Attributes & (FileAttributes.Hidden | FileAttributes.System)) == 0
+                    && !f.Name.EndsWith(".crdownload", StringComparison.OrdinalIgnoreCase)
+                    && !f.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase)
+                    && !f.Name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            int today = files.Count(f => f.LastWriteTime.Date == DateTime.Today);
+            var latest = files.OrderByDescending(f => f.LastWriteTimeUtc).Take(12)
+                .Select(f => new DownloadEntry(f.FullName, f.Name, f.LastWriteTime)).ToList();
+            return new Snapshot(folder, latest, today);
         }
-        foreach (var dead in PidPath.Keys.Where(k => !seen.ContainsKey(k)).ToList()) PidPath.Remove(dead);
-        LastCpu.Clear();
-        foreach (var kv in seen) LastCpu[kv.Key] = kv.Value;
-        _lastAt = now;
-        return rows.GroupBy(r => r.name)
-            .Select(g => (name: g.Key, path: g.Select(x => x.path).FirstOrDefault(x => x != null), cpu: g.Sum(x => x.cpu), mem: g.Sum(x => x.mem)))
-            .OrderByDescending(r => byCpu ? r.cpu : r.mem).Take(3).ToList();
+        catch { return new Snapshot(folder, Array.Empty<DownloadEntry>(), 0); }
     }
 
-    static readonly Dictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase);
-    static string Friendly(Process p, string? path)
+    static string ResolveFolder()
     {
-        if (path == null) return p.ProcessName;
-        if (Names.TryGetValue(path, out var n)) return n;
-        try { var d = FileVersionInfo.GetVersionInfo(path).FileDescription; n = string.IsNullOrWhiteSpace(d) ? p.ProcessName : d.Trim(); }
-        catch { n = p.ProcessName; }
-        return Names[path] = n;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders");
+            if (key?.GetValue("{374DE290-123F-4565-9164-39C4925E467B}") is string path && Directory.Exists(path)) return path;
+        }
+        catch { }
+        return Folder;
     }
-
-    protected override void OnClick() => WinActions.OpenTaskManager();
 }
 
 /// <summary>
@@ -373,32 +410,6 @@ public sealed class DownloadsWidget : WidgetBase
 {
     readonly Grid _fan = new() { Width = 30, Height = 30 };
     TextBlock _count = null!;
-    protected override int TickSeconds => 30;
-
-    static string Folder
-    {
-        get
-        {
-            try
-            {
-                using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders");
-                if (k?.GetValue("{374DE290-123F-4565-9164-39C4925E467B}") is string p && Directory.Exists(p)) return p;
-            }
-            catch { }
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        }
-    }
-
-    static List<FileSystemInfo> Latest(int n)
-    {
-        try
-        {
-            return new DirectoryInfo(Folder).EnumerateFileSystemInfos()
-                .Where(f => (f.Attributes & (FileAttributes.Hidden | FileAttributes.System)) == 0 && !f.Name.EndsWith(".crdownload") && !f.Name.EndsWith(".part") && !f.Name.EndsWith(".tmp"))
-                .OrderByDescending(f => f.LastWriteTimeUtc).Take(n).ToList();
-        }
-        catch { return new(); }
-    }
 
     protected override UIElement BuildContent()
     {
@@ -406,9 +417,17 @@ public sealed class DownloadsWidget : WidgetBase
         return H(_fan, V(Text("Downloads", 8.5, FontWeights.SemiBold), _count).Margin(9, 0, 2, 0));
     }
 
-    protected override async void OnTick(DateTime now)
+    protected override void OnAttach()
     {
-        var files = await Task.Run(() => Latest(3));
+        DownloadsSnapshot.Changed += RenderSnapshot;
+        RenderSnapshot();
+    }
+
+    protected override void OnDetach() => DownloadsSnapshot.Changed -= RenderSnapshot;
+
+    void RenderSnapshot()
+    {
+        var files = DownloadsSnapshot.Entries.Take(3).ToList();
         _fan.Children.Clear();
         for (int i = files.Count - 1; i >= 0; i--)
         {
@@ -418,15 +437,14 @@ public sealed class DownloadsWidget : WidgetBase
             _fan.Children.Add(img);
         }
         if (files.Count == 0) _fan.Children.Add(Icon(Glyphs.Download, 15, "Text.Secondary"));
-        int today = await Task.Run(() => { try { return new DirectoryInfo(Folder).EnumerateFileSystemInfos().Count(f => f.LastWriteTime.Date == DateTime.Today); } catch { return 0; } });
-        _count.Text = today == 0 ? "nothing new today" : $"{today} today";
+        _count.Text = !DownloadsSnapshot.Ready ? "checking…" : DownloadsSnapshot.Today == 0 ? "nothing new today" : $"{DownloadsSnapshot.Today} today";
     }
 
     protected override double CardWidth => 380;
     protected override UIElement BuildCard()
     {
         var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 4 };
-        foreach (var f in Latest(12))
+        foreach (var f in DownloadsSnapshot.Entries)
         {
             var file = f;
             var img = new Image { Width = 40, Height = 40 };
@@ -439,10 +457,10 @@ public sealed class DownloadsWidget : WidgetBase
             cell.ToolTip = $"{f.Name}\n{f.LastWriteTime:g}";
             grid.Children.Add(cell);
         }
-        if (grid.Children.Count == 0) grid.Children.Add(Text("Your Downloads folder is empty.", 12, null, "Text.Secondary"));
+        if (grid.Children.Count == 0) grid.Children.Add(Text(DownloadsSnapshot.Ready ? "Your Downloads folder is empty." : "Checking Downloads…", 12, null, "Text.Secondary"));
         return V(Card.Header("Downloads", Icon(Glyphs.Download, 16, "Accent")), grid,
-            Card.Footer(Folder, "Open folder", () => { FlyoutWindow.CloseCurrent(); WindowTracker.Launch(Folder); }));
+            Card.Footer(DownloadsSnapshot.Folder, "Open folder", () => { FlyoutWindow.CloseCurrent(); WindowTracker.Launch(DownloadsSnapshot.Folder); }));
     }
 
-    protected override void AddMenuItems(ContextMenu menu) => menu.Items.Add(Item("Open Downloads folder", () => WindowTracker.Launch(Folder)));
+    protected override void AddMenuItems(ContextMenu menu) => menu.Items.Add(Item("Open Downloads folder", () => WindowTracker.Launch(DownloadsSnapshot.Folder)));
 }

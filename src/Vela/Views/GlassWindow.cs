@@ -103,6 +103,16 @@ public class GlassWindow : Window
         {
             RegionElement.SizeChanged += (_, _) => UpdateRegion();
             RegionElement.Loaded += (_, _) => UpdateRegion();
+            if (LiveBackdrop)
+            {
+                // Deferred: these fire inside layout / render passes, where creating a window can fail.
+                void Later() => Dispatcher.BeginInvoke(SyncLiveBackdrop, System.Windows.Threading.DispatcherPriority.Background);
+                RegionElement.SizeChanged += (_, _) => Later();
+                RegionElement.Loaded += (_, _) => Later();
+                LocationChanged += (_, _) => Later();
+                IsVisibleChanged += (_, _) => Later();
+                Closed += (_, _) => { try { _live?.Close(); } catch { } };
+            }
         }
         SizeChanged += (_, _) => UpdateRegion();
     }
@@ -126,6 +136,31 @@ public class GlassWindow : Window
     public double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;
 
     bool _regionCleared;
+
+    /// <summary>
+    /// macOS-style frosted panel: a live-blur <see cref="BackdropWindow"/> under <see cref="RegionElement"/> (cards, picker,
+    /// control panel) while Settings.LiveBlur is on; the panel itself paints a translucent Flyout.Background.
+    /// </summary>
+    protected bool LiveBackdrop { get; set; }
+    BackdropWindow? _live;
+
+    /// <summary>Re-place the blur under the panel (call after a slide animation settles).</summary>
+    protected void SyncLiveBackdrop()
+    {
+        var el = RegionElement;
+        if (!LiveBackdrop || !Core.Settings.Current.LiveBlur || el == null || !IsVisible || Hwnd == IntPtr.Zero || !el.IsLoaded || el.ActualWidth <= 0)
+        { _live?.HideBackdrop(); return; }
+        try
+        {
+            var tl = el.PointToScreen(new Point(0, 0));
+            var br = el.PointToScreen(new Point(el.ActualWidth, el.ActualHeight));
+            _live ??= new BackdropWindow(BackdropWindow.Best);
+            _live.Place(new RECT { Left = (int)Math.Round(tl.X), Top = (int)Math.Round(tl.Y), Right = (int)Math.Round(br.X), Bottom = (int)Math.Round(br.Y) }, RegionRadius * DpiScale, Hwnd);
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    protected void HideLiveBackdrop() => _live?.HideBackdrop();
 
     public void UpdateRegion()
     {

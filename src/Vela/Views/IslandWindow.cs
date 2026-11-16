@@ -218,14 +218,27 @@ public sealed class IslandWindow : GlassWindow
         _shown = key;
     }
 
+    /// <summary>0 = compact pill, 1 = expanded card. One animated value drives height, minimum width, corner
+    /// radius and padding together, so the island morphs instead of snapping (Dynamic-Island style).</summary>
+    public static readonly DependencyProperty ExpansionProperty = DependencyProperty.Register(nameof(Expansion), typeof(double), typeof(IslandWindow),
+        new PropertyMetadata(0.0, (d, _) => ((IslandWindow)d).ApplyExpansion()));
+    public double Expansion { get => (double)GetValue(ExpansionProperty); set => SetValue(ExpansionProperty, value); }
+
+    void ApplyExpansion()
+    {
+        double t = Expansion;
+        static double L(double a, double b, double k) => a + (b - a) * k;
+        _pill.Height = L(CompactH, ExpandedH, t);
+        _pill.MinWidth = L(CompactMinW, ExpandedW, t);
+        _pill.CornerRadius = new CornerRadius(L(CompactH / 2, 26, t));
+        _pill.Padding = new Thickness(L(6, 14, t), L(0, 12, t), L(10, 14, t), L(0, 12, t));
+    }
+
     void Resize(bool big)
     {
-        var dur = TimeSpan.FromMilliseconds(190);
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        _pill.BeginAnimation(HeightProperty, new DoubleAnimation(big ? ExpandedH : CompactH, dur) { EasingFunction = ease });
-        _pill.MinWidth = big ? ExpandedW : CompactMinW;
-        _pill.CornerRadius = new CornerRadius(big ? 26 : CompactH / 2);
-        _pill.Padding = big ? new Thickness(14, 12, 14, 12) : new Thickness(6, 0, 10, 0);
+        // A slight overshoot on the way out gives the springy feel of the reference island.
+        var ease = big ? (IEasingFunction)new BackEase { Amplitude = 0.25, EasingMode = EasingMode.EaseOut } : new CubicEase { EasingMode = EasingMode.EaseOut };
+        BeginAnimation(ExpansionProperty, new DoubleAnimation(big ? 1 : 0, TimeSpan.FromMilliseconds(big ? 200 : 170)) { EasingFunction = ease });
     }
 
     void Fade(bool show)

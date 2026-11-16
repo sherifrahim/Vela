@@ -47,7 +47,7 @@ public sealed class WindowPreview : Window
     static ImageSource? _pendingIcon;
 
     readonly List<IntPtr> _thumbs = new();
-    readonly StackPanel _cards = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(Pad) };
+    readonly WrapPanel _cards = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(Pad) };
     IntPtr _hwnd;
     public FrameworkElement? Anchor { get; private set; }
 
@@ -79,7 +79,15 @@ public sealed class WindowPreview : Window
 
     public static bool IsOpen => _instance != null;
 
-    public static void CloseAll() { ShowTimer.Stop(); HideTimer.Stop(); _instance?.Close(); }
+    public static void CloseAll()
+    {
+        ShowTimer.Stop();
+        HideTimer.Stop();
+        _pendingAnchor = null;
+        _pendingWindows = null;
+        _pendingIcon = null;
+        _instance?.Close();
+    }
 
     static void Open(FrameworkElement anchor, IReadOnlyList<AppWindow> windows, ImageSource? icon)
     {
@@ -141,10 +149,11 @@ public sealed class WindowPreview : Window
         _windows = windows;
         Resources.MergedDictionaries.Clear();
         if (DockWindow.For(anchor)?.AdaptiveResources is { } rd) Resources.MergedDictionaries.Add(rd);
+        ConfigureRows(anchor, windows.Count);
         if (!same || _cards.Children.Count == 0)
         {
             _cards.Children.Clear();
-            for (int i = 0; i < windows.Count; i++) _cards.Children.Add(Card(windows[i], icon, i < windows.Count - 1));
+            foreach (var window in windows) _cards.Children.Add(Card(window, icon));
         }
         if (!IsVisible)
         {
@@ -157,7 +166,17 @@ public sealed class WindowPreview : Window
         PlaceThumbnails();
     }
 
-    FrameworkElement Card(AppWindow w, ImageSource? icon, bool gapAfter)
+    void ConfigureRows(FrameworkElement anchor, int count)
+    {
+        var dock = DockWindow.For(anchor);
+        var monitor = (dock?.MonitorInfo(out _) ?? GetPrimaryMonitor(out _)).rcMonitor;
+        double scale = VisualTreeHelper.GetDpi(anchor).DpiScaleX;
+        double available = Math.Max(CardW + Gap, monitor.Width / scale - Pad * 2 - 20);
+        int columns = Math.Clamp((int)Math.Floor(available / (CardW + Gap)), 1, Math.Max(1, count));
+        _cards.Width = columns * (CardW + Gap);
+    }
+
+    FrameworkElement Card(AppWindow w, ImageSource? icon)
     {
         var close = CircleButton(UI.Glyphs.Close, () =>
         {
@@ -177,7 +196,7 @@ public sealed class WindowPreview : Window
         var card = new Border
         {
             Width = CardW, CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 2, 8, 8),
-            Margin = new Thickness(0, 0, gapAfter ? Gap : 0, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent,
+            Margin = new Thickness(0, 0, Gap, Gap), Cursor = Cursors.Hand, Background = Brushes.Transparent,
             Child = V(header, thumbSlot), Tag = w.Hwnd,
         };
         card.MouseEnter += (_, _) => { card.Bg("Tile.Hover"); thumbSlot.SetResourceReference(Border.BorderBrushProperty, "Accent"); };
@@ -209,7 +228,9 @@ public sealed class WindowPreview : Window
         bool top = Settings.Current.Edge == "top";
         double w = ActualWidth * s, h = ActualHeight * s, gap = 10 * s;
         double x = Math.Clamp(c.X - w / 2, mon.Left + gap, Math.Max(mon.Left + gap, mon.Right - gap - w));
-        double y = top ? barBottom + gap : barTop - gap - h;
+        double preferredY = top ? barBottom + gap : barTop - gap - h;
+        double minY = mon.Top + gap, maxY = Math.Max(minY, mon.Bottom - gap - h);
+        double y = Math.Clamp(preferredY, minY, maxY);
         Left = x / s; Top = y / s;
     }
 

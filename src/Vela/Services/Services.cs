@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Vela.Connectors;
 using Vela.Core;
 using Vela.Shell;
@@ -13,6 +14,7 @@ public static class Services
     public static Ticker Ticker { get; } = new();
 
     static readonly Lazy<SystemMonitor> _sys = new(() => new SystemMonitor());
+    static readonly Lazy<TopProcessService> _topProcesses = new(() => new TopProcessService());
     static readonly Lazy<GpuMonitor> _gpu = new(() => new GpuMonitor());
     static readonly Lazy<AudioEndpoint> _speakers = new(() => new AudioEndpoint(0));
     static readonly Lazy<AudioEndpoint> _mic = new(() => new AudioEndpoint(1));
@@ -35,6 +37,7 @@ public static class Services
     static readonly Lazy<StripeConnector> _stripe = new(() => new StripeConnector());
 
     public static SystemMonitor Sys => _sys.Value;
+    public static TopProcessService TopProcesses => _topProcesses.Value;
     public static GpuMonitor Gpu => _gpu.Value;
     public static AudioEndpoint Speakers => _speakers.Value;
     public static AudioEndpoint Microphone => _mic.Value;
@@ -63,5 +66,140 @@ public static class Services
         if (_screenTime.IsValueCreated) _screenTime.Value.Flush();
         if (_data.IsValueCreated) _data.Value.Flush();
         Settings.Flush();
+    }
+}
+
+public sealed record TopProcess(string Name, string? Path, double Cpu, long Memory);
+
+/// <summary>
+/// One process snapshot shared by every Top CPU / Top RAM widget on every display.
+/// Sampling runs off the UI thread every 10 seconds and only while at least one widget listens.
+/// </summary>
+public sealed class TopProcessService
+{
+    sealed record PreviousProcess(long Started, string ProcessName, TimeSpan Cpu, string? Path);
+    sealed record Snapshot(DateTime At, Dictionary<int, PreviousProcess> Processes,
+        IReadOnlyList<TopProcess> Cpu, IReadOnlyList<TopProcess> Ram);
+
+    readonly Dictionary<string, string> _names = new(StringComparer.OrdinalIgnoreCase);
+    Dictionary<int, PreviousProcess> _previous = new();
+    DateTime _lastAt;
+    int _seconds;
+    int _generation;
+    bool _busy;
+    Action? _updated;
+
+    public IReadOnlyList<TopProcess> ByCpu { get; private set; } = Array.Empty<TopProcess>();
+    public IReadOnlyList<TopProcess> ByRam { get; private set; } = Array.Empty<TopProcess>();
+
+    public event Action? Updated
+    {
+        add
+        {
+            bool first = _updated == null;
+            _updated += value;
+            if (first)
+            {
+                _generation++;
+                _seconds = 0;
+                Services.Ticker.Tick += OnTick;
+                Refresh();
+            }
+        }
+        remove
+        {
+            _updated -= value;
+            if (_updated == null)
+            {
+                _generation++;
+                Services.Ticker.Tick -= OnTick;
+                _previous = new();
+                _lastAt = default;
+            }
+        }
+    }
+
+    void OnTick(DateTime _)
+    {
+        if (++_seconds < 10) return;
+        _seconds = 0;
+        Refresh();
+    }
+
+    async void Refresh()
+    {
+        if (_busy) return;
+        _busy = true;
+        int generation = _generation;
+        try
+        {
+            var previous = _previous;
+            var lastAt = _lastAt;
+            var snapshot = await Task.Run(() => Capture(previous, lastAt));
+            if (generation != _generation || _updated == null) return;
+            _previous = snapshot.Processes;
+            _lastAt = snapshot.At;
+            ByCpu = snapshot.Cpu;
+            ByRam = snapshot.Ram;
+            _updated?.Invoke();
+        }
+        catch (Exception ex) { Log.Warn("Top processes: " + ex.Message); }
+        finally
+        {
+            _busy = false;
+            // If the last listener detached and a new one attached during Capture, discard the
+            // stale snapshot above and immediately seed the new subscription.
+            if (generation != _generation && _updated != null) Refresh();
+        }
+    }
+
+    Snapshot Capture(Dictionary<int, PreviousProcess> previous, DateTime lastAt)
+    {
+        var now = DateTime.UtcNow;
+        double wall = Math.Max(1, (now - lastAt).TotalMilliseconds) * Environment.ProcessorCount;
+        var current = new Dictionary<int, PreviousProcess>();
+        var rows = new List<TopProcess>();
+        foreach (var process in Process.GetProcesses())
+        {
+            try
+            {
+                if (process.Id == 0) continue;
+                var cpu = process.TotalProcessorTime;
+                string processName = process.ProcessName;
+                long started = 0;
+                try { started = process.StartTime.ToUniversalTime().Ticks; } catch { }
+                bool same = previous.TryGetValue(process.Id, out var old) && old.ProcessName == processName
+                    && (started == 0 || old.Started == 0 || started == old.Started) && cpu >= old.Cpu;
+                string? path = same ? old!.Path : null;
+                if (!same)
+                {
+                    try { path = process.MainModule?.FileName; } catch { }
+                }
+                double percent = same && lastAt != default ? (cpu - old!.Cpu).TotalMilliseconds / wall * 100 : 0;
+                current[process.Id] = new PreviousProcess(started, processName, cpu, path);
+                rows.Add(new TopProcess(Friendly(processName, path), path, Math.Max(0, percent), process.WorkingSet64));
+            }
+            catch { }
+            finally { process.Dispose(); }
+        }
+
+        var grouped = rows.GroupBy(r => r.Name).Select(g => new TopProcess(
+            g.Key, g.Select(x => x.Path).FirstOrDefault(x => x != null), g.Sum(x => x.Cpu), g.Sum(x => x.Memory))).ToList();
+        return new Snapshot(now, current,
+            grouped.OrderByDescending(x => x.Cpu).Take(3).ToList(),
+            grouped.OrderByDescending(x => x.Memory).Take(3).ToList());
+    }
+
+    string Friendly(string processName, string? path)
+    {
+        if (path == null) return processName;
+        if (_names.TryGetValue(path, out var name)) return name;
+        try
+        {
+            var description = FileVersionInfo.GetVersionInfo(path).FileDescription;
+            name = string.IsNullOrWhiteSpace(description) ? processName : description.Trim();
+        }
+        catch { name = processName; }
+        return _names[path] = name;
     }
 }

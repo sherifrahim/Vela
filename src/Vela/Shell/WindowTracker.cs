@@ -245,8 +245,13 @@ public static class ScreenEvents
     {
         if (idObject != 0 || idChild != 0 || hwnd == IntPtr.Zero) return; // OBJID_WINDOW of a window, not carets/cursors
         if (ev == EVENT_OBJECT_LOCATIONCHANGE && GetAncestor(hwnd, 2 /*GA_ROOT*/) != hwnd) return;
+        // Ignore Vela's own windows (docks, blur backdrops, cards, island): moving them must not wake the docks.
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        if (pid == OwnPid) return;
         _changed?.Invoke();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    static readonly uint OwnPid = (uint)Environment.ProcessId;
 }

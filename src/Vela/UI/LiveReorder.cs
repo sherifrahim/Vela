@@ -17,6 +17,8 @@ public sealed class LiveReorder
     readonly Panel _panel;
     readonly UIElement _item;
     readonly double _grab;           // pointer offset inside the item when the drag started
+    readonly int _originalZ;
+    readonly double _originalOpacity;
     static readonly IEasingFunction Ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
     public LiveReorder(Panel panel, UIElement item, Point pointerInPanel)
@@ -24,6 +26,8 @@ public sealed class LiveReorder
         _panel = panel;
         _item = item;
         _grab = pointerInPanel.X - VisualX(item);
+        _originalZ = Panel.GetZIndex(item);
+        _originalOpacity = item.Opacity;
         Panel.SetZIndex(item, 10);
         item.Opacity = 0.92;
     }
@@ -80,7 +84,8 @@ public sealed class LiveReorder
                 t.X = 0;
                 double delta = was - layoutX;
                 if (Math.Abs(delta) < 0.5 && Math.Abs(cur) < 0.5) continue;
-                t.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(delta, 0, TimeSpan.FromMilliseconds(170)) { EasingFunction = Ease });
+                t.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(delta, 0, TimeSpan.FromMilliseconds(170))
+                    { EasingFunction = Ease, FillBehavior = FillBehavior.Stop });
             }
             moved = true;
         }
@@ -97,8 +102,11 @@ public sealed class LiveReorder
     {
         var t = ShiftOf(_item);
         double cur = t.X;
-        t.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(cur, 0, TimeSpan.FromMilliseconds(160)) { EasingFunction = Ease });
-        _item.Opacity = 1;
-        Panel.SetZIndex(_item, 0);
+        t.BeginAnimation(TranslateTransform.XProperty, null);
+        t.X = 0; // keep the base value clean after the animation clock is removed
+        t.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(cur, 0, TimeSpan.FromMilliseconds(160))
+            { EasingFunction = Ease, FillBehavior = FillBehavior.Stop });
+        _item.Opacity = _originalOpacity;
+        Panel.SetZIndex(_item, _originalZ);
     }
 }

@@ -59,6 +59,8 @@ public partial class DockWindow : GlassWindow
     public const double BarPadding = 3, BarRadius = 16;
     /// <summary>Gap between the top of the bar and the reserved work area (room for the bar's shadow).</summary>
     const double TopGap = 4;
+    /// <summary>Transparent space above the bar (not reserved from other windows) for magnified icons.</summary>
+    public const double Headroom = 18;
 
     public DockWindow(string? device = null)
     {
@@ -67,7 +69,9 @@ public partial class DockWindow : GlassWindow
         if (device == null) Instance = this; else Title = "Vela Dock (" + device.TrimStart('\\', '.') + ")";
         All.Add(this);
         NoActivate = true;
-        RegionElement = Bar;
+        // No clip on the bar: its rounded layers round themselves, and magnified app icons must be able to
+        // rise above it into the transparent headroom (macOS dock).
+        RegionElement = null;
         RegionRadius = BarRadius;
         BarHost.LayoutTransform = _sizeScale;
         Left = -32000; Top = -32000; Width = 100; Height = 60;
@@ -76,7 +80,7 @@ public partial class DockWindow : GlassWindow
         Settings.Changed += OnSettingChanged;
         WallpaperGlass.Changed += UpdateGlass;
         Bar.SizeChanged += (_, _) => UpdateGlass();
-        WidgetBase.EditModeChanged += () => Items.Cursor = WidgetBase.EditMode ? Cursors.SizeWE : null;
+        WidgetBase.EditModeChanged += OnEditMode;
 
         Bar.ContextMenu = new ContextMenu();
         Bar.ContextMenuOpening += (_, e) =>
@@ -87,6 +91,8 @@ public partial class DockWindow : GlassWindow
         Closed += (_, _) =>
         {
             All.Remove(this);
+            WidgetBase.EditModeChanged -= OnEditMode;
+            try { _backdrop?.Close(); } catch { }
             if (_autoHideHooked && _autoHide != null) { Svc.Windows.ForegroundChanged -= _autoHide.Poke; ScreenEvents.Changed -= _autoHide.Poke; }
             _adaptive?.Dispose();
             Svc.Windows.ForegroundChanged -= PokeAdaptive;
@@ -107,6 +113,8 @@ public partial class DockWindow : GlassWindow
         SizeChanged += (_, _) => FitItems();
     }
 
+    void OnEditMode() => Items.Cursor = WidgetBase.EditMode ? Cursors.SizeWE : null;
+
     /// <summary>
     /// Dynamic fit: if the widgets need more width than the screen offers (small display, size L, many
     /// widgets), scale the row down uniformly (to 60 % at most) instead of clipping; back to 100 % when it fits.
@@ -123,6 +131,26 @@ public partial class DockWindow : GlassWindow
         if (Math.Abs(f - cur) < 0.005) return;
         Items.LayoutTransform = f >= 0.999 ? Transform.Identity : new ScaleTransform(f, f);
         if (f < 1) Log.Info($"Dock content scaled to {f:P0} to fit the screen");
+    }
+
+    // ------------------------------------------------------------------ live blur backdrop
+
+    BackdropWindow? _backdrop;
+
+    /// <summary>Keep this dock's blur window exactly under the bar (or hidden).</summary>
+    void SyncBackdrop()
+    {
+        bool want = LiveBlurOn && Hwnd != IntPtr.Zero && Bar.IsLoaded && !_fullscreenHidden && _autoHide?.IsHidden != true;
+        if (!want) { _backdrop?.HideBackdrop(); return; }
+        try
+        {
+            var tl = Bar.PointToScreen(new Point(0, 0));
+            var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
+            _backdrop ??= new BackdropWindow(BackdropWindow.Best);
+            double radius = BarRadius * ThemeManager.SizeScale * VisualTreeHelper.GetDpi(this).DpiScaleX;
+            _backdrop.Place(new RECT { Left = (int)Math.Round(tl.X), Top = (int)Math.Round(tl.Y), Right = (int)Math.Round(br.X), Bottom = (int)Math.Round(br.Y) }, radius, Hwnd);
+        }
+        catch (InvalidOperationException) { }
     }
 
     // ------------------------------------------------------------------ auto-hide
@@ -145,7 +173,12 @@ public partial class DockWindow : GlassWindow
         if (_autoHide == null)
         {
             _autoHide = new DockAutoHide(this, BarHost);
-            _autoHide.HiddenChanged += hidden => EdgeTrigger.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
+            _autoHide.HiddenChanged += hidden =>
+            {
+                EdgeTrigger.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
+                if (hidden) _backdrop?.HideBackdrop();
+                else _ = Task.Delay(230).ContinueWith(_ => Dispatcher.BeginInvoke(SyncBackdrop)); // after the 200 ms slide settles
+            };
             BarHost.MouseEnter += (_, _) => _autoHide.PointerArrived();
             BarHost.MouseLeave += (_, _) => _autoHide.PointerLeft();
             EdgeTrigger.MouseEnter += (_, _) => _autoHide.PointerArrived();
@@ -233,7 +266,7 @@ public partial class DockWindow : GlassWindow
         RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
         brush.Freeze();
         _adaptiveBrush = brush;
-        Bar.Background = brush;
+        if (!LiveBlurOn) Bar.Background = brush; // with live blur the sample only drives light/dark
         // Hysteresis so a mid-grey window doesn't make the dock flicker between light and dark.
         bool light = _adaptiveLight switch
         {
@@ -363,13 +396,15 @@ public partial class DockWindow : GlassWindow
     }
 
     /// <summary>Line the blurred wallpaper slice up with the bar's current screen position.</summary>
+    /// <summary>Live blur is on: the real blur comes from <see cref="BackdropWindow"/> under the bar.</summary>
+    static bool LiveBlurOn => Settings.Current.LiveBlur && ThemeManager.GlassOn;
+
     void UpdateGlass()
     {
-        if (Settings.Current.AdaptiveTheme)
-        {
-            PokeAdaptive();                                                  // re-sample after any move / resize
-            if (_adaptiveBrush != null) { Bar.Background = _adaptiveBrush; return; }
-        }
+        if (Settings.Current.AdaptiveTheme) PokeAdaptive();                 // re-sample (light/dark) after any move / resize
+        if (LiveBlurOn) { Bar.Background = null; SyncBackdrop(); return; }
+        _backdrop?.HideBackdrop();
+        if (Settings.Current.AdaptiveTheme && _adaptiveBrush != null) { Bar.Background = _adaptiveBrush; return; }
         if (Hwnd == IntPtr.Zero || !Bar.IsLoaded || !ThemeManager.GlassOn)
         {
             Bar.Background = null;
@@ -398,6 +433,7 @@ public partial class DockWindow : GlassWindow
         {
             case "theme": case "size": case "accent": ThemeManager.Apply(); break;
             case "glass": WallpaperGlass.Reload(); ThemeManager.Apply(); break;
+            case "liveblur": ThemeManager.Apply(); UpdateGlass(); break;
             case "adaptive": ThemeManager.Apply(); SetupAdaptive(); break;
             case "autohide": QueueReposition(); SetupAutoHide(); break;
             case "island": if (IsPrimary) IslandWindow.Sync(); break;
@@ -425,7 +461,8 @@ public partial class DockWindow : GlassWindow
         double margin = Math.Max(0, s.EdgeMargin);
         double hairline = 1 / dpi;
         double barH = (WidgetBase.TileHeight + 2 * BarPadding) * ThemeManager.SizeScale + 2 * hairline;
-        int hPx = (int)Math.Ceiling((barH + margin + TopGap) * dpi);
+        int hPx = (int)Math.Ceiling((barH + margin + TopGap) * dpi);   // reserved from other windows
+        int winPx = hPx + (int)Math.Ceiling(Headroom * dpi);              // window = reservation + magnify headroom
 
         var rect = mi.rcMonitor;
         if (top) rect.Bottom = rect.Top + hPx; else rect.Top = rect.Bottom - hPx;
@@ -440,8 +477,8 @@ public partial class DockWindow : GlassWindow
         BarHost.VerticalAlignment = top ? VerticalAlignment.Top : VerticalAlignment.Bottom;
         BarHost.Margin = top ? new Thickness(side, margin, side, 0) : new Thickness(side, 0, side, margin);
         Shadow.Margin = top ? new Thickness(1, -1, 1, 1) : new Thickness(1, 1, 1, -1);
-        SetWindowPos(Hwnd, HWND_TOPMOST, mi.rcMonitor.Left, top ? mi.rcMonitor.Top : mi.rcMonitor.Bottom - hPx,
-            mi.rcMonitor.Width, hPx, SWP_NOACTIVATE);
+        SetWindowPos(Hwnd, HWND_TOPMOST, mi.rcMonitor.Left, top ? mi.rcMonitor.Top : mi.rcMonitor.Bottom - winPx,
+            mi.rcMonitor.Width, winPx, SWP_NOACTIVATE);
         UpdateRegion();
         Dispatcher.BeginInvoke(UpdateGlass, System.Windows.Threading.DispatcherPriority.Loaded);
         // Windows that were maximized while the taskbar was hidden still cover the whole screen; fit them
@@ -789,23 +826,33 @@ public partial class DockWindow : GlassWindow
         {
             FlyoutWindow.CloseCurrent();
             ShowWindow(Hwnd, SW_HIDE);
+            _backdrop?.HideBackdrop();
         }
         else
         {
             ShowWindow(Hwnd, SW_SHOWNOACTIVATE);
             SetWindowPos(Hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
+        if (!fs) SyncBackdrop();
         // Stop drawing and polling only when *every* display is fullscreen; a game on one screen
         // must not freeze the clock on the other.
         Svc.Ticker.Paused = All.All(d => d._fullscreenHidden);
         if (IsPrimary) PrimaryFullscreenChanged?.Invoke(fs);
     }
 
+    /// <summary>
+    /// Fullscreen on *this* display. The shell's notification state is global, so it only counts when the
+    /// foreground window is on this dock's monitor (a game on display 2 must not hide display 1's dock).
+    /// </summary>
     bool IsFullscreenActive()
     {
-        if (IsPrimary && SHQueryUserNotificationState(out int state) == 0 && state is 2 or 3 or 4) return true; // busy / D3D fullscreen / presentation
         var fg = GetForegroundWindow();
         if (fg == IntPtr.Zero || fg == Hwnd) return false;
+        bool onMyDisplay = MonitorFromWindow(fg, 2) == MonitorFromWindow(Hwnd, 2);
+        if (!onMyDisplay) return _fullscreenHidden; // focus moved to another display: keep this one as it is
+        if (SHQueryUserNotificationState(out int state) == 0 && state is 3 or 4) return true; // D3D fullscreen / presentation
+        bool busy = state == 2;
+        if (busy && GetWindowRect(fg, out var br)) { var bm = MonitorInfo(out _).rcMonitor; if (br.Left <= bm.Left && br.Top <= bm.Top && br.Right >= bm.Right && br.Bottom >= bm.Bottom) return true; }
         var cls = GetClassNameOf(fg);
         if (cls is "Progman" or "WorkerW" or "Shell_TrayWnd") return false;
         long style = GetWindowLongPtr(fg, GWL_STYLE).ToInt64();

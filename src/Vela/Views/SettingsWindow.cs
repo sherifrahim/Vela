@@ -46,6 +46,7 @@ public sealed class SettingsWindow : GlassWindow
         root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
         root.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         RegionElement = root;
+        LiveBackdrop = true;
 
         // Sidebar
         var brand = H(new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(8), Child = Icon(Glyphs.Grid, 12, "OnAccent") }.Bg("Accent"),
@@ -143,7 +144,7 @@ public sealed class SettingsWindow : GlassWindow
             "Restored exactly as it was whenever Vela quits. Emergency: run  Vela.exe --restore-taskbar");
         Toggle("Reserve screen space", "Maximized windows stop above the dock instead of going underneath.", s.ReserveSpace, v => { s.ReserveSpace = v; Settings.Save("dock"); });
         Toggle("24-hour clock", null, s.Use24Hour, v => { s.Use24Hour = v; Settings.Save("clock"); });
-        Toggle("Show app names on hover", null, s.ShowAppNames, v => { s.ShowAppNames = v; Settings.Save(); });
+        Toggle("Show app names on hover", null, s.ShowAppNames, v => { s.ShowAppNames = v; Settings.Save("pins"); });
         Field("Quick actions", Wrap(new[]
         {
             Btn("Widget gallery", () => DockWindow.Instance?.OpenWidgetPicker()),
@@ -174,6 +175,7 @@ public sealed class SettingsWindow : GlassWindow
         Toggle("Match the screen", "Each display's dock picks up the colours of what's open on that display and switches between light and dark to match.", s.AdaptiveTheme, v => { s.AdaptiveTheme = v; Settings.Save("adaptive"); });
 
         Section("Glass");
+        Toggle("Live blur", "Blur whatever is really behind the dock, live, like the reference app (GPU-rendered by Windows). Off: a blurred copy of your wallpaper.", s.LiveBlur, v => { s.LiveBlur = v; Settings.Save("liveblur"); });
         Field("Effect", Wrap(new[] { ("auto", "Style default"), ("off", "Off (solid)"), ("frosted", "Frosted"), ("liquid", "Liquid Glass") }
             .Select(x => Segment(x.Item2, "glassfx", s.GlassEffect == x.Item1, () => { s.GlassEffect = x.Item1; Settings.Save("glass"); Rebuild(); }))),
             "Frosted blurs and brightens the desktop behind the bar (macOS vibrancy). Liquid Glass adds a specular rim and glow to the bar and every tile.");
@@ -197,13 +199,13 @@ public sealed class SettingsWindow : GlassWindow
             .Select(x => Segment(x.Item2, "autohide", s.AutoHide == x.Item1, () => { s.AutoHide = x.Item1; Settings.Save("autohide"); }))),
             "Hidden docks come back when the pointer touches the screen edge. Auto-hide gives the reserved space back to your windows.");
         Toggle("Vela Island", "A black pill at the top of the main display for what's happening now: music, timers, volume and power. Hover to expand.", s.Island, v => { s.Island = v; Settings.Save("island"); });
-        Toggle("Live window previews", "Hover a running app to see its windows; click one to switch, ✕ to close it.", s.WindowPreviews, v => { s.WindowPreviews = v; Settings.Save(); });
+        Toggle("Live window previews", "Hover a running app to see its windows; click one to switch, ✕ to close it.", s.WindowPreviews, v => { s.WindowPreviews = v; Settings.Save("pins"); });
         Field("Displays", Wrap(new[] { ("all", "Every display"), ("primary", "Main display only") }
             .Select(x => Segment(x.Item2, "displays", s.Displays == x.Item1, () => { s.Displays = x.Item1; Settings.Save("displays"); }))),
             "With several monitors, each one gets its own dock with the same widgets.");
         Toggle("App tiles", "Each app sits in its own tile, like the widgets. Off: loose icons like the macOS dock.", s.AppTiles, v => { s.AppTiles = v; Settings.Save("pins"); });
-        Toggle("Magnification", "Icons grow under the pointer and their neighbours make room, like the macOS dock.", s.Magnification, v => { s.Magnification = v; Settings.Save(); });
-        Field("Magnification size", SliderRow(s.MagnifyAmount * 100, 110, 160, "%", v => { s.MagnifyAmount = Math.Round(v) / 100; Settings.Save(); }));
+        Toggle("Magnification", "Icons grow under the pointer and their neighbours make room, like the macOS dock.", s.Magnification, v => { s.Magnification = v; Settings.Save("pins"); });
+        Field("Magnification size", SliderRow(s.MagnifyAmount * 100, 110, 160, "%", v => { s.MagnifyAmount = Math.Round(v) / 100; Settings.Save("pins"); }));
     }
 
     void WidgetsPage()

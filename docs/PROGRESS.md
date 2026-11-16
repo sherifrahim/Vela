@@ -4,6 +4,48 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-16 — Claude (Opus 5.5) + Codex — session 5: live blur everywhere, first joint pass with Codex
+
+**Released** v0.4.0 (premium pass) at the start of this session.
+
+**How we worked:** the owner asked Claude and Codex to collaborate. Claude briefed Codex (the app's bundled CLI,
+`codex exec`, session `01a1e539-e5d4-70d1-80c0-60208f18c780`), Codex reviewed the repo read-only, then both
+implemented in parallel with a strict file split (Codex: AudioService, Services, ReferenceWidgets, AppsWidget,
+WindowPreview, LiveReorder, tests/, tools/smoke.ps1; Claude: everything else + docs). Codex built only to
+`.codex-build/`, never touched the running dock, never committed.
+
+**Changed (uncommitted)**
+- Live blur, done properly: `Views/BackdropWindow.cs` (accent Acrylic, non-layered, rounded region) under every dock
+  bar and — via `GlassWindow.LiveBackdrop` — under cards, the widget picker and the control panel, which are now
+  translucent frosted glass (`Flyout.Background` alpha 0xC4 dark / 0xD6 light while `LiveBlur` is on).
+  `Vela.exe --blur-test` compares materials on the second display.
+- Claude: crash-proof staged `App.Cleanup` (taskbar restore always runs last); per-display fullscreen detection;
+  island morph (one animated `Expansion` drives height/width/radius/padding); 18 DIP headroom above the bar for
+  magnified icons (`DockWindow.Headroom`, bar no longer clipped); adaptive-sampler hash covers all channels; app
+  settings saved with the "pins" key; EditMode handler leak fixed; ScreenEvents ignores Vela's own windows (a
+  self-triggered loop had cost 6 % CPU).
+- Codex: native Core Audio callbacks (no 1 Hz polling), one race-guarded shared top-process sampler, cached async
+  Downloads snapshot, frame-rate-independent magnification, preview rows that fit the display, LiveReorder cleanup,
+  `tests/Vela.Tests` (14 xUnit tests), `tools/smoke.ps1`.
+- Bugs found while testing: card backdrop created inside a render pass (zero HWND) → deferred; backdrop window
+  stole activation and closed cards → `EnsureHandle` + card re-activates itself if a backdrop grabs focus.
+
+**Verified**
+- `dotnet test`: 14/14 pass. Build 0 warnings / 0 errors. `--quit` logs "Vela stopped cleanly".
+- Live blur under the dock and under the Control Centre card, over a striped test window on display 2.
+- Idle (2 docks, settled): 109 ms CPU / 30 s (~0.36 % of a core), WS ~59 MB.
+
+**Not verified** (owner was playing Days Gone fullscreen on display 1 — one synthetic click landed in the game;
+no further input was sent there): main-display magnification headroom, island morph live, auto-hide, previews.
+
+**Next up**
+1. Live-check on display 1: magnification rising above the bar, island morph, frosted picker/control panel.
+2. Round 2 with Codex: its remaining items (smoke script run on a free machine, audio device-switch card) and the
+   unified per-dock visibility state machine (Claude, `DockWindow`).
+3. `BackdropWindow` for `WindowPreview` (non-layered already: apply the accent to the preview window itself).
+
+---
+
 ## 2026-11-16 — Claude (Opus 5.5) — session 4: release 0.3.0, lumabar deep-dive, premium pass, Vela Island
 
 **Released** v0.3.0 (github.com/sherifrahim/Vela/releases/tag/v0.3.0) before this work.
@@ -37,6 +79,10 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 - Builds 0 errors; no ERROR lines. `--render` output reviewed: dock, all 53 catalogue widgets, island
   (timer compact/expanded, volume, power) look right.
 - Idle (2 docks, adaptive heartbeat, island): 94 ms CPU / 20 s (~0.47 % of a core), WS 30 MB.
+
+**Follow-up in the same session (uncommitted):** real **live blur** — `Views/BackdropWindow.cs` (accent Acrylic
+under each bar, `LiveBlur` setting, `--blur-test`), verified on display 2 over a striped test window: colours behind
+the dock blur through it live. Fixed a self-triggered event loop (6 % CPU → 0.3 %).
 
 **Not verified** (owner had an Unreal Engine app fullscreen on display 1 the whole session — the main dock and
 the island were hidden; no synthetic input was sent)

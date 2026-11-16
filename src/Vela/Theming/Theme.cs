@@ -193,7 +193,8 @@ public static class ThemeManager
         B("Fill.Track", p.Track);
         B("Fill.Control", p.Control);
         B("Fill.ControlHover", p.ControlHover);
-        B("Flyout.Background", p.Flyout);
+        // Live blur on: panels become frosted glass (macOS popover / reference cards); off: opaque.
+        B("Flyout.Background", s.LiveBlur ? Color.FromArgb(p.IsLight ? (byte)0xD6 : (byte)0xC4, p.Flyout.R, p.Flyout.G, p.Flyout.B) : p.Flyout);
         B("Flyout.Border", p.FlyoutBorder);
         B("Divider", p.Divider);
         B("Sys.Red", p.Red);
