@@ -40,6 +40,14 @@ warnings.
   Core Audio sessions (grouped by exe; click the icon to mute). `Services/AudioMixer.cs` reads on demand only; session COM
   refs are released when the card unloads. Rendered with real data (2 devices, 2 apps); device switching NOT exercised
   live (would have moved the owner's game audio).
+- 11 local widgets (`Widgets/LocalWidgets.cs`): Date, Today, 7 Days, Segment Clock, Clock & Weather, Battery Gauge,
+  Battery Core, Keyboard, Language, Weather Details, Claude Usage (tokens). Open-indicator setting (dot / large / line).
+- Account widgets (owner: "let users connect and enjoy them"): `MetricConnector` / `RevenueConnector` bases + 16
+  connectors in `Connectors/AccountConnectors.cs`, one generic `MetricWidget` (+ chart variant) and `TotalRevenueWidget`
+  in `Widgets/AccountWidgets.cs`; they appear on Settings → Connections automatically. Two-part inputs (site + key,
+  store + token, key + symbols) go in one field separated by a space. Endpoints checked (401/403 without a key),
+  LeetCode checked end to end; **no connector has been tried with a real key**.
+- `docs/PARITY.md`: 81 of the reference's 109 widgets; what is missing and why.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

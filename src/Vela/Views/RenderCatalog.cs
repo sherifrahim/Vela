@@ -32,7 +32,7 @@ public static class RenderCatalog
 
         // 2) Every widget, labelled, in a grid of bars.
         var all = WidgetRegistry.All.Where(d => !d.Hidden && d.Type is not "apps").ToList();
-        var grid = new WrapPanel { Width = 1500 };
+        var grid = new WrapPanel { Width = 1700 };
         var catalog = new List<WidgetBase>();
         foreach (var d in all)
         {
@@ -50,8 +50,8 @@ public static class RenderCatalog
         Save(Backdrop(dock), Path.Combine(dir, "dock.png"));
         Save(Backdrop(grid), Path.Combine(dir, "catalog.png"));
         // 3) A few cards (solid, as they open over the dock).
-        var cards = new WrapPanel { Width = 1120 };
-        foreach (var type in new[] { "claude", "codex", "terminal", "volume", "quicktoggles", "clock" })
+        var cards = new WrapPanel { Width = 1500 };
+        foreach (var type in new[] { "claude", "codex", "terminal", "volume", "linear", "revenue.total" })
         {
             var w = catalog.FirstOrDefault(c => c.Instance?.Type == type);
             if (w?.CardForRender() is not { } content) continue;

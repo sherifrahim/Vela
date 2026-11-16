@@ -35,6 +35,13 @@ public static class Services
     static readonly Lazy<CodexConnector> _codex = new(() => new CodexConnector());
     static readonly Lazy<GitHubConnector> _github = new(() => new GitHubConnector());
     static readonly Lazy<StripeConnector> _stripe = new(() => new StripeConnector());
+    // Account widgets (finance, analytics, developer, online, stocks): cheap to create; they only poll while a widget listens.
+    static readonly Lazy<MetricConnector[]> _accounts = new(() => new MetricConnector[]
+    {
+        new PolarConnector(), new LemonSqueezyConnector(), new PaddleConnector(), new GumroadConnector(), new ShopifyConnector(), new DodoConnector(),
+        new DeepSeekConnector(), new PlausibleConnector(), new DubConnector(), new LinearConnector(), new SupabaseConnector(), new ResendConnector(),
+        new YouTubeConnector(), new LeetCodeConnector(), new GitHubActivityConnector(), new FinnhubConnector(),
+    });
 
     public static SystemMonitor Sys => _sys.Value;
     public static TopProcessService TopProcesses => _topProcesses.Value;
@@ -58,8 +65,11 @@ public static class Services
     public static CodexConnector Codex => _codex.Value;
     public static GitHubConnector GitHub => _github.Value;
     public static StripeConnector Stripe => _stripe.Value;
+    public static IReadOnlyList<MetricConnector> Accounts => _accounts.Value;
+    public static MetricConnector Account(string id) => Accounts.First(a => a.Id == id);
 
-    public static IEnumerable<IConnector> AllConnectors => new IConnector[] { Claude, Codex, GitHub, Stripe };
+    // GitHub Activity shares the GitHub token, so it has no row of its own on the Connections page.
+    public static IEnumerable<IConnector> AllConnectors => new IConnector[] { Claude, Codex, GitHub, Stripe }.Concat(Accounts.Where(a => a.Id != "githubactivity"));
 
     public static void FlushAll()
     {

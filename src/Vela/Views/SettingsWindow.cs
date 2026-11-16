@@ -205,6 +205,9 @@ public sealed class SettingsWindow : GlassWindow
             "With several monitors, each one gets its own dock with the same widgets.");
         Toggle("Lock dock", "Widgets, apps and the bar stay where they are; rearrange them only while the widget picker is open.", s.LockDock, v => { s.LockDock = v; Settings.Save("dock"); });
         Toggle("Alt+T opens PowerShell (admin)", "PowerShell as administrator from anywhere (Windows asks to confirm). Turn off if an app needs Alt+T.", s.AdminShellHotkey, v => { s.AdminShellHotkey = v; Settings.Save("dock"); });
+        Field("Open indicator", Wrap(new[] { ("dot", "Dot"), ("large", "Large dot"), ("line", "Line") }
+            .Select(x => Segment(x.Item2, "indicator", s.OpenIndicator == x.Item1, () => { s.OpenIndicator = x.Item1; Settings.Save("pins"); }))),
+            "The mark under apps that are open.");
         Toggle("App tiles", "Each app sits in its own tile, like the widgets. Off: loose icons like the macOS dock.", s.AppTiles, v => { s.AppTiles = v; Settings.Save("pins"); });
         Toggle("Magnification", "Icons grow under the pointer and their neighbours make room, like the macOS dock.", s.Magnification, v => { s.Magnification = v; Settings.Save("pins"); });
         Field("Magnification size", SliderRow(s.MagnifyAmount * 100, 110, 160, "%", v => { s.MagnifyAmount = Math.Round(v) / 100; Settings.Save("pins"); }));

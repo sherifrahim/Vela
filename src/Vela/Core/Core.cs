@@ -210,6 +210,21 @@ public static class Http
         return JsonDocument.Parse(body);
     }
 
+    /// <summary>POST a JSON body (GraphQL APIs) and parse the JSON answer.</summary>
+    public static async Task<JsonDocument> PostJsonAsync(string url, object body, Action<HttpRequestMessage>? configure = null, CancellationToken ct = default)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(body), System.Text.Encoding.UTF8, "application/json"),
+        };
+        configure?.Invoke(req);
+        using var res = await Client.SendAsync(req, ct).ConfigureAwait(false);
+        var text = await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!res.IsSuccessStatusCode)
+            throw new HttpRequestException($"{(int)res.StatusCode} {res.ReasonPhrase}: {Truncate(text, 200)}", null, res.StatusCode);
+        return JsonDocument.Parse(text);
+    }
+
     static string Truncate(string s, int n) => s.Length <= n ? s : s[..n];
 }
 

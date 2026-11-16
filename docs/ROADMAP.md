@@ -63,17 +63,17 @@ Todo, roughly by value:
 - [x] Top CPU / Top RAM tiles (shared sampler)
 - [ ] Temperature (WMI MSAcpi_ThermalZoneTemperature needs admin → research LibreHardwareMonitor-style alternatives)
 - [x] Flip clock, analog minimal, world clocks, weather status, hourly, today & forecast, Top CPU / Top RAM
-- [ ] Segment clock, clock & weather, 7 days, battery core / gauge, temperature, day timeline, stock watchlist
+- [~] Segment clock, clock & weather, 7 days, battery core / gauge, stock watchlist done; temperature, day timeline open
 - [ ] Now Playing compact + bar variants (per-app mixer done: Speakers tile → "Output and apps")
 - [ ] Quick toggles: hotspot, airplane, energy saver, Ethernet status, user-selectable toggles
 - [x] Weather hourly / today & forecast / status / sunrise tiles
 - [ ] Brightness for external monitors (DDC/CI via dxva2 `SetMonitorBrightness`)
 - [ ] Search / Commands launcher, Recently opened, Screenshot capture
 - [ ] AI: Gemini (Antigravity), Grok, DeepSeek balance (key), GLM (key), OpenCode (local), Cursor
-- [ ] Finance: Polar, Dodo, Shopify, Lemon Squeezy, Paddle, Gumroad, Total Revenue (+ charts)
+- [x] Finance: Polar, Dodo, Shopify, Lemon Squeezy, Paddle, Gumroad, Total Revenue (+ charts) — untested with real keys
 - [ ] GitHub activity grid / overview, Gmail (own OAuth client, loopback redirect), LeetCode
-- [ ] Analytics & developer: Plausible, DataFast, Dub, Search Console, Resend, Linear, Supabase
-- [ ] Stocks: watchlist + chart (Finnhub key)
+- [~] Analytics & developer: Plausible, Dub, Resend, Linear, Supabase done; DataFast, Search Console open
+- [~] Stocks: watchlist done (Finnhub); chart open (candles are paid on Finnhub)
 - [ ] Social: YouTube (API key), X, TikTok, Instagram
 - [ ] Wallpaper gallery
 

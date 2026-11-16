@@ -517,7 +517,11 @@ public sealed class AppItem : Grid
         // Running apps show live previews (with titles) instead of a tooltip.
         ToolTip = Settings.Current.ShowAppNames && (windows == 0 || !Settings.Current.WindowPreviews) ? name : null;
         _dot.Visibility = windows > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _dot.Width = windows > 1 ? 8 : 3;
+        // Reference "open indicator": a dot, a larger dot, or a short line (wider when the app has several windows).
+        var (w1, wn, h) = Settings.Current.OpenIndicator switch { "large" => (5.0, 11.0, 5.0), "line" => (12.0, 18.0, 2.5), _ => (3.0, 8.0, 3.0) };
+        _dot.Width = windows > 1 ? wn : w1;
+        _dot.Height = h;
+        _dot.CornerRadius = new CornerRadius(h / 2);
         _dot.Bg(flashing ? "Sys.Orange" : "Accent");
         // Like the macOS dock: an app asking for attention bounces once.
         if (flashing && !_flashing) Bounce();

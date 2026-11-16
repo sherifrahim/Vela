@@ -29,7 +29,7 @@ public sealed class WidgetPickerWindow : GlassWindow
     {
         ["Clocks"] = Glyphs.Clock, ["Productivity"] = Glyphs.Task, ["System"] = Glyphs.Settings, ["Apps & Files"] = Glyphs.AllApps,
         ["Media & Audio"] = Glyphs.Volume, ["AI"] = Glyphs.Lightning, ["Finance"] = Glyphs.Money, ["Stocks"] = Glyphs.Chart,
-        ["Weather"] = Glyphs.Brightness, ["Online & Mail"] = Glyphs.Mail,
+        ["Weather"] = Glyphs.Brightness, ["Online & Mail"] = Glyphs.Mail, ["Analytics"] = Glyphs.Chart, ["Developer"] = Glyphs.Code, ["Social"] = Glyphs.Bell,
     };
 
     public WidgetPickerWindow(DockWindow dock)

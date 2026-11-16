@@ -12,7 +12,7 @@ public static class WidgetRegistry
 {
     public static readonly string[] Categories =
     {
-        "Clocks", "Productivity", "System", "Apps & Files", "Media & Audio", "AI", "Finance", "Stocks", "Weather", "Online & Mail",
+        "Clocks", "Productivity", "System", "Apps & Files", "Media & Audio", "AI", "Finance", "Analytics", "Developer", "Stocks", "Weather", "Online & Mail", "Social",
     };
 
     public static readonly IReadOnlyList<WidgetDescriptor> All = new List<WidgetDescriptor>
@@ -27,6 +27,11 @@ public static class WidgetRegistry
         new("yearprogress", "Year Progress", "Clocks", () => new YearDotsWidget()),
         new("clock.flip", "Flip Clock", "Clocks", () => new FlipClockWidget()),
         new("clock.analog", "Analog Minimal", "Clocks", () => new AnalogClockWidget()),
+        new("date.full", "Date", "Clocks", () => new DateWidget()),
+        new("today", "Today", "Clocks", () => new TodayWidget()),
+        new("clock.week", "7 Days", "Clocks", () => new SevenDaysWidget()),
+        new("clock.segment", "Segment Clock", "Clocks", () => new SegmentClockWidget()),
+        new("clock.weather", "Clock & Weather", "Clocks", () => new ClockWeatherWidget()),
         new("clock.world", "World Clocks", "Clocks", () => new WorldClocksWidget()),
 
         // Productivity
@@ -49,6 +54,10 @@ public static class WidgetRegistry
         new("battery", "Battery", "System", () => new BatteryWidget()),
         new("battery.dots", "Battery Dots", "System", () => new BatteryDotsWidget()),
         new("battery.ring", "Battery Ring", "System", () => new BatteryRingWidget()),
+        new("battery.gauge", "Battery Gauge", "System", () => new BatteryGaugeWidget()),
+        new("battery.core", "Battery Core", "System", () => new BatteryCoreWidget()),
+        new("keyboard", "Keyboard", "System", () => new KeyboardWidget()),
+        new("language", "Language", "System", () => new LanguageWidget()),
         new("quicktoggles", "Quick Toggles", "System", () => new QuickTogglesWidget()),
         new("brightness", "Brightness", "System", () => new BrightnessWidget()),
         new("themetoggle", "Theme Toggle", "System", () => new ActionWidget(ActionWidget.Kind.Theme)),
@@ -73,22 +82,47 @@ public static class WidgetRegistry
 
         // AI
         new("claude", "Claude Plan Usage", "AI", () => new ClaudeWidget(), "claude"),
+        new("claude.tokens", "Claude Usage", "AI", () => new ClaudeTokensWidget()),
         new("codex", "ChatGPT Usage", "AI", () => new CodexWidget(), "codex"),
+        new("deepseek", "DeepSeek Balance", "AI", () => new MetricWidget("deepseek"), "deepseek"),
         new("ailimits", "AI Limits", "AI", () => new AiLimitsWidget()),
 
         // Finance / Stocks
         new("stripe", "Stripe", "Finance", () => new StripeWidget(), "stripe"),
+        new("revenue.total", "Total Revenue", "Finance", () => new TotalRevenueWidget()),
+        new("polar", "Polar", "Finance", () => new MetricWidget("polar"), "polar"),
+        new("polar.chart", "Polar Chart", "Finance", () => new MetricWidget("polar", chart: true), "polar"),
+        new("dodo", "Dodo Payments", "Finance", () => new MetricWidget("dodo"), "dodo"),
+        new("dodo.chart", "Dodo Chart", "Finance", () => new MetricWidget("dodo", chart: true), "dodo"),
+        new("shopify", "Shopify", "Finance", () => new MetricWidget("shopify"), "shopify"),
+        new("shopify.chart", "Shopify Chart", "Finance", () => new MetricWidget("shopify", chart: true), "shopify"),
+        new("lemonsqueezy", "Lemon Squeezy", "Finance", () => new MetricWidget("lemonsqueezy"), "lemonsqueezy"),
+        new("lemonsqueezy.chart", "Lemon Squeezy Chart", "Finance", () => new MetricWidget("lemonsqueezy", chart: true), "lemonsqueezy"),
+        new("paddle", "Paddle", "Finance", () => new MetricWidget("paddle"), "paddle"),
+        new("paddle.chart", "Paddle Chart", "Finance", () => new MetricWidget("paddle", chart: true), "paddle"),
+        new("gumroad", "Gumroad", "Finance", () => new MetricWidget("gumroad"), "gumroad"),
+        new("gumroad.chart", "Gumroad Chart", "Finance", () => new MetricWidget("gumroad", chart: true), "gumroad"),
         new("crypto", "Crypto", "Stocks", () => new CryptoWidget()),
+        new("stocks.watchlist", "Stock Watchlist", "Stocks", () => new MetricWidget("finnhub"), "finnhub"),
+        new("plausible", "Plausible", "Analytics", () => new MetricWidget("plausible", chart: true), "plausible"),
+        new("dub", "Dub", "Analytics", () => new MetricWidget("dub", chart: true), "dub"),
+        new("resend", "Resend", "Developer", () => new MetricWidget("resend"), "resend"),
+        new("linear", "Linear", "Developer", () => new MetricWidget("linear"), "linear"),
+        new("supabase", "Supabase", "Developer", () => new MetricWidget("supabase"), "supabase"),
 
         // Weather
         new("weather", "Weather", "Weather", () => new WeatherWidget()),
         new("weather.sun", "Sunrise & Sunset", "Weather", () => new SunWidget()),
         new("weather.status", "Weather Status", "Weather", () => new WeatherStatusWidget()),
+        new("weather.details", "Weather Details", "Weather", () => new WeatherDetailsWidget()),
         new("weather.hourly", "Hourly", "Weather", () => new HourlyWidget()),
         new("weather.forecast", "Today & Forecast", "Weather", () => new ForecastWidget()),
 
         // Online
         new("github", "GitHub", "Online & Mail", () => new GitHubWidget(), "github"),
+        new("github.activity", "GitHub Activity", "Online & Mail", () => new MetricWidget("githubactivity", chart: true), "github"),
+        new("leetcode", "LeetCode Stats", "Online & Mail", () => new MetricWidget("leetcode"), "leetcode"),
+        new("youtube", "YouTube", "Social", () => new MetricWidget("youtube"), "youtube"),
 
         // Containers (not in the picker; created from widget menus)
         new("stack", "Stack", "Layout", () => new StackWidget(), Hidden: true),
