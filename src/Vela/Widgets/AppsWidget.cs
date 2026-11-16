@@ -513,7 +513,8 @@ public sealed class AppItem : Grid
     public void SetActive(bool active)
     {
         _active = active;
-        _bg.Opacity = active ? 1 : IsMouseOver ? 0.7 : 0;
+        // Loose icons (reference / macOS): no box behind the icon; the running dot is the only state mark.
+        _bg.Opacity = !Tiled ? 0 : active ? 1 : IsMouseOver ? 0.7 : 0;
     }
 
     public void InvalidateVisualTree()
@@ -535,7 +536,7 @@ public sealed class AppItem : Grid
 
     void Hover(bool on)
     {
-        _bg.Opacity = _active ? 1 : on && (!Settings.Current.Magnification || Tiled) ? 0.7 : 0;
+        _bg.Opacity = !Tiled ? 0 : _active ? 1 : on ? 0.7 : 0;
         if (Settings.Current.Magnification) return; // the strip drives scale itself (AppsWidget.Magnifier)
         var dur = TimeSpan.FromMilliseconds(on ? 140 : 180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };

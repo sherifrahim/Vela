@@ -59,7 +59,7 @@ public static class Palettes
     /// <summary>Clear glass: wallpaper shows through, frosted, with a bright rim highlight.</summary>
     public static readonly Palette LiquidGlass = new(
         "glass", "Liquid Glass", false, BackdropKind.Blur,
-        Bar: C(0x66141414), BarBorderTop: C(0x40FFFFFF), BarBorderBottom: C(0x14FFFFFF), Sheen: C(0x0BFFFFFF),
+        Bar: C(0x66141414), BarBorderTop: C(0x2EFFFFFF), BarBorderBottom: C(0x1AFFFFFF), Sheen: C(0x0BFFFFFF),
         Tile: C(0x2E000000), TileHover: C(0x3D000000), TileBorder: C(0x1FFFFFFF),
         Text: C(0xFFFFFFFF), TextSecondary: C(0x8CFFFFFF), TextTertiary: C(0x59FFFFFF),
         Track: C(0x2EFFFFFF), Control: C(0x24FFFFFF), ControlHover: C(0x38FFFFFF),
@@ -169,12 +169,12 @@ public static class ThemeManager
         var border = new LinearGradientBrush(p.BarBorderTop, p.BarBorderBottom, 90);
         border.Freeze();
         r["Bar.Border"] = border;
-        var sheenColor = Liquid ? Color.FromArgb(Math.Max(p.Sheen.A, (byte)0x2E), 255, 255, 255) : p.Sheen;
+        var sheenColor = Liquid ? Color.FromArgb(Math.Max(p.Sheen.A, (byte)0x10), 255, 255, 255) : p.Sheen;
         var sheen = new LinearGradientBrush(
             new GradientStopCollection { new(sheenColor, 0), new(Color.FromArgb(0, sheenColor.R, sheenColor.G, sheenColor.B), Liquid ? 0.6 : 0.55) }, 90);
         sheen.Freeze();
         r["Bar.Sheen"] = sheen;
-        r["Bar.Rim"] = Liquid ? Rim(0x9C, 0x14, 0x40) : Brushes.Transparent;
+        r["Bar.Rim"] = Liquid ? Rim(0x3A, 0x0C, 0x1C) : Brushes.Transparent;
         // Inner shading (the reference bar: a faint light from the top edge, a soft shadow rising from the bottom).
         r["Bar.Shade"] = Shade(p.IsLight);
 
@@ -185,7 +185,7 @@ public static class ThemeManager
                 : (Color.FromArgb(0x1C, 255, 255, 255), Color.FromArgb(0x2C, 255, 255, 255), Color.FromArgb(0x2E, 255, 255, 255));
         B("Tile.Background", tile.Item1);
         B("Tile.Hover", tile.Item2);
-        if (Liquid) r["Tile.Border"] = Rim(0x66, 0x0A, 0x26); else B("Tile.Border", tile.Item3);
+        if (Liquid) r["Tile.Border"] = Rim(0x2E, 0x14, 0x1A); else B("Tile.Border", tile.Item3);
 
         B("Text.Primary", p.Text);
         B("Text.Secondary", p.TextSecondary);

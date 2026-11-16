@@ -38,6 +38,12 @@ WindowPreview, LiveReorder, tests/, tools/smoke.ps1; Claude: everything else + d
 **Not verified** (owner was playing Days Gone fullscreen on display 1 — one synthetic click landed in the game;
 no further input was sent there): main-display magnification headroom, island morph live, auto-hide, previews.
 
+**Follow-up (same day, after owner feedback "looks like a 2005 Nokia theme", "black box overlay over the icons"):**
+`AppTiles` now defaults to false (loose icons on the glass, like the reference); hover/active never draws a box behind
+loose icons (the running dot is the only state mark). Liquid Glass toned down: bar rim 0x9C→0x3A, sheen 0x2E→0x10, tile
+rim 0x66→0x2E, bar border top/bottom 0x40/0x14 → 0x2E/0x1A (closer to a uniform macOS hairline). Rendered off-screen
+only; uncommitted.
+
 **Next up**
 1. Live-check on display 1: magnification rising above the bar, island morph, frosted picker/control panel.
 2. Round 2 with Codex: its remaining items (smoke script run on a free machine, audio device-switch card) and the
