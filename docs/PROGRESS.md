@@ -62,6 +62,10 @@ warnings.
   list (dismiss / clear all), WhatsApp tile (unread chats + latest message). Verified live: Claude 1, ChatGPT 6.
 - Calendar events via private iCal links (Google / Outlook / iCloud), `Ics` parser (RRULE, EXDATE, RECURRENCE-ID,
   TZID, all-day); the Calendar tile shows the next event. Tests 24/24. No real iCal link tried yet. Now 96 of 109.
+- Notification polling: change events aren't delivered to unpackaged apps, so it polls every 10 s and only parses new
+  notifications. Badges off vs on measured 1.33 % vs 1.02 % of a core (noise) — but the whole dock now idles at ~1 %
+  while the owner is active (game + apps), vs 0.26 % measured earlier when idle. **Next up: profile idle CPU on a quiet
+  PC** (WinEvent hook traffic? adaptive sampler? Claude log scan?) and get it back under 0.5 %.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

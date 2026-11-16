@@ -12,15 +12,20 @@ public sealed record ToastItem(uint Id, string App, string Aumid, string Title, 
 /// Notifications waiting in Action Center, through Windows' notification listener (Settings → Privacy &amp; security →
 /// Notifications must allow Vela; Windows asks once). Read-only except for an explicit "Clear". Powers app badges
 /// (unread counts on dock icons), the Notifications tile and the WhatsApp tile.
-/// Polls every few seconds only while something is subscribed; nothing leaves this PC.
+/// Listens for Windows change events (or polls every 10 s where they are unavailable) only while something is
+/// subscribed; nothing leaves this PC.
 /// </summary>
 public sealed class NotificationService
 {
     UserNotificationListener? _listener;
     Action? _changed;
     DateTime _last;
-    bool _busy, _asked;
-    const int PollSeconds = 4;
+    bool _busy, _asked, _again;
+    // Windows' change event when it works for this process; otherwise a slow poll. Either way, a safety re-read.
+    bool _event;
+    int PollSeconds => _event ? 120 : 10;
+    // Parsed notifications by id: a refresh only reads the texts of notifications it hasn't seen yet.
+    Dictionary<uint, ToastItem> _cache = new();
 
     public IReadOnlyList<ToastItem> Items { get; private set; } = Array.Empty<ToastItem>();
     public UserNotificationListenerAccessStatus Access { get; private set; } = UserNotificationListenerAccessStatus.Unspecified;
@@ -29,7 +34,13 @@ public sealed class NotificationService
     public event Action? Changed
     {
         add { bool first = _changed == null; _changed += value; if (first) { Svc.Ticker.Tick += OnTick; _ = RefreshAsync(); } }
-        remove { _changed -= value; if (_changed == null) Svc.Ticker.Tick -= OnTick; }
+        remove
+        {
+            _changed -= value;
+            if (_changed != null) return;
+            Svc.Ticker.Tick -= OnTick;
+            if (_event && _listener != null) { try { _listener.NotificationChanged -= OnNative; } catch { } _event = false; }
+        }
     }
 
     void OnTick(DateTime now)
@@ -37,9 +48,19 @@ public sealed class NotificationService
         if ((now - _last).TotalSeconds >= PollSeconds) _ = RefreshAsync();
     }
 
+    void OnNative(UserNotificationListener sender, Windows.UI.Notifications.UserNotificationChangedEventArgs args) =>
+        Application.Current?.Dispatcher.BeginInvoke(() => { if (_changed != null) _ = RefreshAsync(); });
+
+    void TryEvent()
+    {
+        if (_event || _listener == null) return;
+        try { _listener.NotificationChanged += OnNative; _event = true; Log.Info("Notifications: change events on"); }
+        catch (Exception ex) { _event = false; Log.Info("Notifications: no change events here (" + ex.Message + "); polling"); }
+    }
+
     public async Task RefreshAsync()
     {
-        if (_busy) return;
+        if (_busy) { _again = true; return; } // a change arrived mid-read: read once more afterwards
         _busy = true;
         _last = DateTime.Now;
         try
@@ -52,10 +73,13 @@ public sealed class NotificationService
                 Access = await _listener.RequestAccessAsync();
             }
             if (!Available) { SetItems(Array.Empty<ToastItem>()); return; }
+            TryEvent();
             var list = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
             var items = new List<ToastItem>(list.Count);
+            var cache = new Dictionary<uint, ToastItem>(list.Count);
             foreach (var n in list)
             {
+                if (_cache.TryGetValue(n.Id, out var known)) { items.Add(known); cache[n.Id] = known; continue; }
                 string app = "", aumid = "";
                 try { app = n.AppInfo?.DisplayInfo?.DisplayName ?? ""; aumid = n.AppInfo?.AppUserModelId ?? ""; } catch { }
                 string title = "", body = "";
@@ -69,15 +93,22 @@ public sealed class NotificationService
                     }
                 }
                 catch { }
-                items.Add(new ToastItem(n.Id, app, aumid, title, body, n.CreationTime.LocalDateTime));
+                var item = new ToastItem(n.Id, app, aumid, title, body, n.CreationTime.LocalDateTime);
+                items.Add(item);
+                cache[n.Id] = item;
             }
+            _cache = cache;
             SetItems(items.OrderByDescending(i => i.When).ToList());
         }
         catch (Exception ex)
         {
             Log.Warn("Notifications: " + ex.Message);
         }
-        finally { _busy = false; }
+        finally
+        {
+            _busy = false;
+            if (_again) { _again = false; _ = RefreshAsync(); }
+        }
     }
 
     void SetItems(IReadOnlyList<ToastItem> items)
