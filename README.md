@@ -12,7 +12,7 @@ no Electron, no Chromium. Idle cost: ~0 % CPU, ~40 MB working set.
 - **Apps:** Start, your pinned taskbar apps and every open window, grouped per app, with open indicators
   (dot, large dot or line), focus outline, attention bounce, live window previews, jump lists, End task for
   frozen apps, and optional macOS-style magnification.
-- **98 widgets** in 13 categories:
+- **100+ widgets** in 13 categories:
   - *Clocks & productivity:* clock, big/flip/analog/segment clocks, world clocks and world time, date, today,
     7 days, day timeline, day/month/year progress, calendar, screen time, pomodoro, timer, stopwatch, todos,
     notes, currency.
@@ -21,8 +21,9 @@ no Electron, no Chromium. Idle cost: ~0 % CPU, ~40 MB working set.
   - *Apps & files:* recently opened, search, commands, screenshot, storage, recycle bin, downloads stack.
   - *Media:* now playing (5 layouts), a sound card with output switching and a per-app volume mixer, microphone.
   - *Accounts (paste a key, kept encrypted on this PC):* Claude and ChatGPT/Codex plan limits, Claude tokens,
-    DeepSeek; Stripe, Polar, Lemon Squeezy, Paddle, Gumroad, Shopify, Dodo and total revenue; Plausible, Dub;
-    Linear, Supabase, Resend; GitHub (notifications, activity, overview), LeetCode, YouTube; stock watchlist, crypto.
+    DeepSeek, GLM, OpenCode; Stripe, Polar, Lemon Squeezy, Paddle, Gumroad, Shopify, Dodo and total revenue; Plausible, Dub;
+    Linear, Supabase, Resend; Gmail and Search Console (sign in with your own Google OAuth client); GitHub
+    (notifications, activity, overview), LeetCode, YouTube; stock watchlist, crypto.
   - *Weather:* current, status, details, hourly, today & forecast, sunrise & sunset.
 - **Vela Island:** a pill at the top of the screen for music, timers, volume and power.
 - **Five styles** (Black, White, Liquid Glass, Frost Glass, Midnight) with live blur, eight accent colours,

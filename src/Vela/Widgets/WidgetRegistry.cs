@@ -93,6 +93,8 @@ public static class WidgetRegistry
         new("claude.tokens", "Claude Usage", "AI", () => new ClaudeTokensWidget()),
         new("codex", "ChatGPT Usage", "AI", () => new CodexWidget(), "codex"),
         new("deepseek", "DeepSeek Balance", "AI", () => new MetricWidget("deepseek"), "deepseek"),
+        new("glm", "GLM Usage", "AI", () => new MetricWidget("glm"), "glm"),
+        new("opencode", "OpenCode Usage", "AI", () => new MetricWidget("opencode", chart: true), "opencode"),
         new("ailimits", "AI Limits", "AI", () => new AiLimitsWidget()),
 
         // Finance / Stocks
@@ -113,6 +115,7 @@ public static class WidgetRegistry
         new("gumroad.chart", "Gumroad Chart", "Finance", () => new MetricWidget("gumroad", chart: true), "gumroad"),
         new("crypto", "Crypto", "Stocks", () => new CryptoWidget()),
         new("stocks.watchlist", "Stock Watchlist", "Stocks", () => new MetricWidget("finnhub"), "finnhub"),
+        new("searchconsole", "Search Console", "Analytics", () => new MetricWidget("searchconsole", chart: true), "searchconsole"),
         new("plausible", "Plausible", "Analytics", () => new MetricWidget("plausible", chart: true), "plausible"),
         new("dub", "Dub", "Analytics", () => new MetricWidget("dub", chart: true), "dub"),
         new("resend", "Resend", "Developer", () => new MetricWidget("resend"), "resend"),
@@ -128,6 +131,7 @@ public static class WidgetRegistry
         new("weather.forecast", "Today & Forecast", "Weather", () => new ForecastWidget()),
 
         // Online
+        new("gmail", "Gmail", "Online & Mail", () => new MetricWidget("gmail"), "gmail"),
         new("github", "GitHub", "Online & Mail", () => new GitHubWidget(), "github"),
         new("github.activity", "GitHub Activity", "Online & Mail", () => new MetricWidget("githubactivity", chart: true), "github"),
         new("github.overview", "GitHub Overview", "Online & Mail", () => new MetricWidget("githuboverview"), "github"),

@@ -37,10 +37,20 @@ public abstract class MetricConnector : PollingConnector
     public List<double> Series { get; protected set; } = new();
     public virtual string SeriesLabel => "Last 14 days";
 
+    /// <summary>Second step after the key is saved (Google sign-in in the browser). The card shows a button while true.</summary>
+    public virtual bool NeedsSignIn => false;
+    public virtual string SignInLabel => "Sign in";
+    public virtual Task SignInAsync() => Task.CompletedTask;
+
+    /// <summary>Forget the key (and anything derived from it, e.g. a refresh token).</summary>
+    public virtual void Disconnect() { if (SecretName != null) Secrets.Set(SecretName, null); }
+
     protected override async Task FetchAsync()
     {
-        var key = Secrets.Get(SecretName!)?.Trim();
-        if (string.IsNullOrEmpty(key)) { Error = null; return; }
+        // Local connectors (no key) pass an empty string; key connectors stop quietly until a key is saved.
+        var key = SecretName == null ? "" : Secrets.Get(SecretName)?.Trim();
+        if (key == null || (SecretName != null && key.Length == 0) || !IsConnected) { Error = null; return; }
+        if (NeedsSignIn) { Error = null; return; }
         await FetchMetricAsync(key).ConfigureAwait(true);
         Error = null;
         LastUpdated = DateTime.Now;

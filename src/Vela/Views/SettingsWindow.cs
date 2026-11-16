@@ -376,7 +376,7 @@ public sealed class SettingsWindow : GlassWindow
         var status = Text(c.Status, 11.5, null, c.Error != null ? "Sys.Orange" : c.IsConnected ? "Sys.Green" : "Text.Secondary");
         var head = Columns("*,auto", V(Text(c.Name, 13.5, FontWeights.SemiBold), status.Margin(0, 2, 0, 0)),
             c.Auth == ConnectorAuth.ApiKey && c.IsConnected
-                ? Btn("Disconnect", () => { Secrets.Set(c.SecretName!, null); Rebuild(); })
+                ? Btn("Disconnect", () => { if (c is MetricConnector m) m.Disconnect(); else Secrets.Set(c.SecretName!, null); Rebuild(); })
                 : c.HelpUrl != null ? Btn(c.Auth == ConnectorAuth.LocalSignIn ? "Setup guide" : "Get a key", () => WindowTracker.OpenUri(c.HelpUrl)) : new Border());
         var desc = Text(c.Description, 11.5, null, "Text.Tertiary");
         desc.TextWrapping = TextWrapping.Wrap;
@@ -386,6 +386,20 @@ public sealed class SettingsWindow : GlassWindow
             var box = PasswordBox();
             var save = Btn("Connect", () => { Secrets.Set(c.SecretName!, box.Password); Rebuild(); }, true);
             panel.Children.Add(Columns("*,auto", box, save.Margin(8, 0, 0, 0)).Margin(0, 10, 0, 0));
+        }
+        if (c is MetricConnector { NeedsSignIn: true } g)
+        {
+            // Google: the client is saved; finish with a browser sign-in.
+            var note = Text("", 11.5, null, "Sys.Orange");
+            Button? go = null;
+            go = Btn(g.SignInLabel, async () =>
+            {
+                go!.IsEnabled = false; note.Text = "Waiting for the browser…";
+                try { await g.SignInAsync(); Rebuild(); }
+                catch (Exception ex) { note.Text = ex.Message; go.IsEnabled = true; }
+            }, true);
+            go.HorizontalAlignment = HorizontalAlignment.Left;
+            panel.Children.Add(V(go.Margin(0, 10, 0, 0), note.Margin(0, 6, 0, 0)));
         }
         _body.Children.Add(Group(panel));
     }

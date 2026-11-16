@@ -6,7 +6,7 @@ Checked 2026-11-17 against lumabar.xyz (home, /widgets, /docs, /changelog, /term
 no trial. Every widget and feature comes with the one license; there is no free/paid split. So "everything it
 charges for" = the whole app below.
 
-## Widgets: 91 of 109
+## Widgets: 95 of 109
 
 | Category (theirs) | Have | Missing |
 |---|---|---|
@@ -14,11 +14,11 @@ charges for" = the whole app below.
 | Productivity (10) | 9 | WhatsApp (needs notification access) · Calendar has no Google/Outlook/iCloud events yet |
 | System (23) | 20 | Tray, Temperature, Do Not Disturb |
 | Media & Audio (6) | 6 | — |
-| AI (11) | 5 | Gemini (Antigravity sign-in), Grok, GLM, OpenCode, OpenCode Plan, Cursor |
+| AI (11) | 7 | Gemini (reads the Antigravity sign-in), Grok (SuperGrok has no public usage API), OpenCode Plan, Cursor (session lives in its SQLite store) |
 | Finance (15) | 15 | — |
-| Analytics (4) | 2 | Search Console (Google OAuth), DataFast |
+| Analytics (4) | 3 | DataFast |
 | Developer (3) | 3 | — |
-| Online & Mail (6) | 4 | Gmail (own Google OAuth client), Wallpaper Gallery (Unsplash) |
+| Online & Mail (6) | 5 | Wallpaper Gallery (Unsplash) |
 | Social (4) | 1 | X, TikTok, Instagram (their APIs need paid / reviewed developer apps) |
 | Apps & Files (7) | 7 | — |
 | Weather (6) | 6 | — |
@@ -49,3 +49,13 @@ Supabase, Resend, YouTube, LeetCode, GitHub Activity, Stock Watchlist (Finnhub).
 Vela Island, a dock per display with per-display adaptive light/dark, Control Centre (Wi-Fi/Bluetooth device
 lists), stacks, Downloads stack, Terminal launcher + Alt+T admin PowerShell, Task Manager / System Monitor
 tiles, per-app sound mixer and output switch, macOS magnification, open source and free.
+
+## Sign-in widgets (2026-11-17)
+
+- **Gmail, Search Console** (`Connectors/GoogleConnectors.cs`): like the reference, the user brings their own Google
+  Cloud OAuth client ("Desktop app"), pastes "client-id client-secret", then clicks *Sign in with Google*. PKCE +
+  a one-shot listener on 127.0.0.1; read-only scopes; refresh token in Secrets. In Google's testing mode the sign-in
+  lasts 7 days, then the tile asks again. Loopback parsing unit-tested; **never run against a real Google account.**
+- **GLM Coding Plan** (`Connectors/AiConnectors.cs`): Z.ai quota endpoint (`/api/monitor/usage/quota/limit`, also
+  open.bigmodel.cn with a "cn " prefix). Endpoint verified; response parsing written from public descriptions, not a real key.
+- **OpenCode**: summed from OpenCode's local message files; parser unit-tested; OpenCode isn't installed on the dev PC.

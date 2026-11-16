@@ -53,6 +53,9 @@ warnings.
   (ms-screenclip:), Now Playing compact / bar, Stripe Chart, GitHub Overview. Now 91 of 109.
 - `--render … --public` leaves out widgets with personal data (location, process names, recent files) and the cards;
   `docs/screenshots` (dock, dock-white, dock-midnight, widgets) were regenerated with it. README updated (98 widgets).
+- Gmail + Search Console (own Google OAuth client, PKCE, loopback listener; `GoogleAuth`), GLM Coding Plan, OpenCode
+  (local history). `MetricConnector` gained NeedsSignIn / SignInAsync / Disconnect and local (no-key) connectors.
+  Tests 17/17 (OpenCode parser, Google loopback). Now 95 of 109; see docs/PARITY.md for what each still needs.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

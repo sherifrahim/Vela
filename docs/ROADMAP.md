@@ -69,9 +69,9 @@ Todo, roughly by value:
 - [x] Weather hourly / today & forecast / status / sunrise tiles
 - [ ] Brightness for external monitors (DDC/CI via dxva2 `SetMonitorBrightness`)
 - [ ] Search / Commands launcher, Recently opened, Screenshot capture
-- [ ] AI: Gemini (Antigravity), Grok, DeepSeek balance (key), GLM (key), OpenCode (local), Cursor
+- [~] AI: DeepSeek, GLM, OpenCode done; Gemini (Antigravity), Grok, Cursor open
 - [x] Finance: Polar, Dodo, Shopify, Lemon Squeezy, Paddle, Gumroad, Total Revenue (+ charts) — untested with real keys
-- [ ] GitHub activity grid / overview, Gmail (own OAuth client, loopback redirect), LeetCode
+- [x] GitHub activity grid / overview, Gmail (own OAuth client, loopback redirect), LeetCode
 - [~] Analytics & developer: Plausible, Dub, Resend, Linear, Supabase done; DataFast, Search Console open
 - [~] Stocks: watchlist done (Finnhub); chart open (candles are paid on Finnhub)
 - [ ] Social: YouTube (API key), X, TikTok, Instagram

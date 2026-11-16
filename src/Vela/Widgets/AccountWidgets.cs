@@ -60,7 +60,9 @@ public sealed class MetricWidget : WidgetBase
         bool on = c.IsConnected;
         _value.Text = !on ? c.SampleValue : c.LastUpdated == null && c.Error == null ? "…" : c.Value;
         _value.Opacity = on ? 1 : 0.5;
-        _sub.Text = !on ? "sample · click to connect" : c.Error ?? (c.Sub.Length > 0 ? c.Sub : c.Unit);
+        _sub.Text = !on ? (c.Auth == ConnectorAuth.LocalSignIn ? "sample · not found on this PC" : "sample · click to connect")
+            : c.NeedsSignIn ? "click to sign in" : c.Error ?? (c.Sub.Length > 0 ? c.Sub : c.Unit);
+        if (c.NeedsSignIn) { _value.Text = c.SampleValue; _value.Opacity = 0.5; }
         _sub.Fg(on && c.Error != null ? "Sys.Red" : "Text.Secondary");
         if (_spark != null) _spark.SetValues(on && c.Series.Count > 0 ? c.Series : Sample);
         if (_spark != null) _spark.Opacity = on ? 1 : 0.4;
@@ -74,7 +76,33 @@ public sealed class MetricWidget : WidgetBase
     {
         var c = C;
         var header = Card.Header(c.Name, AccountBadge.Make(c, 28));
-        if (!c.IsConnected) return V(header, Card.ConnectForm(c, FlyoutWindow.CloseCurrent));
+        if (!c.IsConnected)
+        {
+            if (c.Auth == ConnectorAuth.ApiKey) return V(header, Card.ConnectForm(c, FlyoutWindow.CloseCurrent));
+            var local = Text(c.Description, 12.5, null, "Text.Secondary");
+            local.TextWrapping = TextWrapping.Wrap;
+            return V(header, local);
+        }
+        if (c.NeedsSignIn)
+        {
+            // Step 2 (Google): the client is saved; the browser sign-in comes back to a one-shot local listener.
+            var note = Text("Your OAuth client is saved. Sign in in the browser; Vela only asks for read-only access.", 12.5, null, "Text.Secondary");
+            note.TextWrapping = TextWrapping.Wrap;
+            var status = Text("", 12, null, "Sys.Red");
+            status.TextWrapping = TextWrapping.Wrap;
+            Button? btn = null;
+            btn = PillButton(c.SignInLabel, async () =>
+            {
+                btn!.IsEnabled = false;
+                status.Fg("Text.Secondary");
+                status.Text = "Waiting for the browser…";
+                try { await c.SignInAsync(); FlyoutWindow.CloseCurrent(); }
+                catch (Exception ex) { status.Fg("Sys.Red"); status.Text = ex.Message; btn.IsEnabled = true; }
+            }, accent: true);
+            btn.HorizontalAlignment = HorizontalAlignment.Left;
+            return V(header, note, btn.Margin(0, 12, 0, 8), status,
+                Card.Footer("Wrong client?", "Disconnect", () => { c.Disconnect(); FlyoutWindow.CloseCurrent(); }));
+        }
 
         var body = new StackPanel();
         body.Children.Add(Label(c.Sub.Length > 0 ? c.Sub : c.Unit));
@@ -109,7 +137,8 @@ public sealed class MetricWidget : WidgetBase
             link.Padding = new Thickness(0, 8, 4, 2);
             body.Children.Add(link);
         }
-        return V(header, body, Card.Footer(c.Status, "Disconnect", () => { Secrets.Set(c.SecretName!, null); FlyoutWindow.CloseCurrent(); }));
+        if (c.Auth == ConnectorAuth.LocalSignIn) return V(header, body, Card.Footer(c.Status, "Refresh", () => _ = c.RefreshAsync()));
+        return V(header, body, Card.Footer(c.Status, "Disconnect", () => { c.Disconnect(); FlyoutWindow.CloseCurrent(); }));
     }
 
     /// <summary>GitHub's green grid for the last 20 weeks.</summary>
@@ -139,7 +168,7 @@ public sealed class MetricWidget : WidgetBase
         var c = C;
         menu.Items.Add(Item("Refresh", () => _ = c.RefreshAsync()));
         if (c.OpenUrl is { } url) menu.Items.Add(Item($"Open {c.Name}", () => WindowTracker.OpenUri(url)));
-        if (c.IsConnected) menu.Items.Add(Item("Logout", () => Secrets.Set(c.SecretName!, null)));
+        if (c.IsConnected && c.Auth == ConnectorAuth.ApiKey) menu.Items.Add(Item("Logout", c.Disconnect));
     }
 }
 
