@@ -196,10 +196,12 @@ public sealed class SettingsWindow : GlassWindow
         Field("Auto-hide", Wrap(new[] { ("off", "Off"), ("smart", "When a window overlaps"), ("always", "Always") }
             .Select(x => Segment(x.Item2, "autohide", s.AutoHide == x.Item1, () => { s.AutoHide = x.Item1; Settings.Save("autohide"); }))),
             "Hidden docks come back when the pointer touches the screen edge. Auto-hide gives the reserved space back to your windows.");
+        Toggle("Vela Island", "A black pill at the top of the main display for what's happening now: music, timers, volume and power. Hover to expand.", s.Island, v => { s.Island = v; Settings.Save("island"); });
         Toggle("Live window previews", "Hover a running app to see its windows; click one to switch, ✕ to close it.", s.WindowPreviews, v => { s.WindowPreviews = v; Settings.Save(); });
         Field("Displays", Wrap(new[] { ("all", "Every display"), ("primary", "Main display only") }
             .Select(x => Segment(x.Item2, "displays", s.Displays == x.Item1, () => { s.Displays = x.Item1; Settings.Save("displays"); }))),
             "With several monitors, each one gets its own dock with the same widgets.");
+        Toggle("App tiles", "Each app sits in its own tile, like the widgets. Off: loose icons like the macOS dock.", s.AppTiles, v => { s.AppTiles = v; Settings.Save("pins"); });
         Toggle("Magnification", "Icons grow under the pointer and their neighbours make room, like the macOS dock.", s.Magnification, v => { s.Magnification = v; Settings.Save(); });
         Field("Magnification size", SliderRow(s.MagnifyAmount * 100, 110, 160, "%", v => { s.MagnifyAmount = Math.Round(v) / 100; Settings.Save(); }));
     }

@@ -24,13 +24,13 @@ public sealed class ClockWidget : WidgetBase
 
     protected override UIElement BuildContent()
     {
-        _day = Text("", 7, FontWeights.Bold, "Sys.Red");
-        _date = Text("", 12.5, FontWeights.Bold);
-        _time = Text("", 12.5, FontWeights.Bold);
-        _ampm = Text("", 7, FontWeights.Bold).Margin(1.5, 0, 0, 1.5);
+        _day = Text("", 6.75, FontWeights.Bold, "Sys.Red");
+        _date = Text("", 11.75, FontWeights.SemiBold);
+        _time = Text("", 11.75, FontWeights.SemiBold);
+        _ampm = Text("", 6.75, FontWeights.SemiBold).Margin(1.5, 0, 0, 1.5);
         _ampm.VerticalAlignment = VerticalAlignment.Bottom;
         _icon = new WeatherIcon { Width = 9, Height = 9, Margin = new Thickness(0, 0, 3, 0) };
-        _temp = Text("", 7.5, FontWeights.SemiBold, "Text.Secondary");
+        _temp = Text("", 7, FontWeights.Medium, "Text.Secondary");
         _weather = H(_icon, _temp).Right();
         _weather.Margin = new Thickness(0, 1, 0, 0);
         _weather.Visibility = Visibility.Collapsed;

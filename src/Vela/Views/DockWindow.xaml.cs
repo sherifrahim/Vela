@@ -23,6 +23,9 @@ public partial class DockWindow : GlassWindow
     public static DockWindow? Instance { get; private set; }
     /// <summary>Every dock: the primary plus one per extra display when Settings.Displays == "all".</summary>
     public static readonly List<DockWindow> All = new();
+    /// <summary>The primary display went fullscreen (true) or back (false). The island hides with it.</summary>
+    public static event Action<bool>? PrimaryFullscreenChanged;
+    public bool IsFullscreenHidden => _fullscreenHidden;
     /// <summary>The dock that contains <paramref name="d"/> (falls back to the primary dock).</summary>
     public static DockWindow? For(DependencyObject? d) => (d != null ? Window.GetWindow(d) as DockWindow : null) ?? Instance;
 
@@ -397,6 +400,7 @@ public partial class DockWindow : GlassWindow
             case "glass": WallpaperGlass.Reload(); ThemeManager.Apply(); break;
             case "adaptive": ThemeManager.Apply(); SetupAdaptive(); break;
             case "autohide": QueueReposition(); SetupAutoHide(); break;
+            case "island": if (IsPrimary) IslandWindow.Sync(); break;
             case "dock": ApplyLook(); break;
             case "widgets": if (_origin != this && _origin != null || _origin == null && !IsPrimary) BuildWidgets(); break;
             case "displays": SyncDisplays(); break;
@@ -785,14 +789,16 @@ public partial class DockWindow : GlassWindow
         {
             FlyoutWindow.CloseCurrent();
             ShowWindow(Hwnd, SW_HIDE);
-            Svc.Ticker.Paused = true;   // dock stops drawing and polling entirely
         }
         else
         {
             ShowWindow(Hwnd, SW_SHOWNOACTIVATE);
             SetWindowPos(Hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-            Svc.Ticker.Paused = false;
         }
+        // Stop drawing and polling only when *every* display is fullscreen; a game on one screen
+        // must not freeze the clock on the other.
+        Svc.Ticker.Paused = All.All(d => d._fullscreenHidden);
+        if (IsPrimary) PrimaryFullscreenChanged?.Invoke(fs);
     }
 
     bool IsFullscreenActive()

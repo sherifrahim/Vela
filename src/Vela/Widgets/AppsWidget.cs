@@ -90,7 +90,7 @@ public sealed class AppsWidget : WidgetBase
         if (_magRunning) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
     }
 
-    void OnSettings(string what) { if (what == "pins") Rebuild(); }
+    void OnSettings(string what) { if (what == "pins") { _items.Clear(); Rebuild(); } } // fresh items (e.g. tile style changed)
 
     void OnTheme() { foreach (var c in _panel.Children.OfType<AppItem>()) c.InvalidateVisualTree(); }
 
@@ -167,8 +167,17 @@ public sealed class AppsWidget : WidgetBase
 
         // Children[0] is Start.
         while (_panel.Children.Count > 1) _panel.Children.RemoveAt(1);
+        bool dividerAdded = false;
         foreach (var g in groups)
         {
+            // macOS dock: a thin divider between pinned apps and the other running apps.
+            if (!dividerAdded && g.Pin == null && groups.Any(x => x.Pin != null))
+            {
+                var div = new Border { Width = 1, Height = 22, Margin = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+                div.Bg("Divider");
+                _panel.Children.Add(div);
+                dividerAdded = true;
+            }
             if (!_items.TryGetValue(g.Key, out var item))
             {
                 item = new AppItem(g.Key);
@@ -419,6 +428,11 @@ public sealed class AppItem : Grid
     public string? Key { get; }
     /// <summary>Icon size and slot width (DIPs at size M), from the reference: 25 px icons on a 36 px pitch.</summary>
     public const double IconSize = 25, SlotWidth = 36;
+    /// <summary>App tiles (Settings.AppTiles): each icon in a square tile with a small gap; else loose macOS-style icons.</summary>
+    static bool Tiled => Settings.Current.AppTiles;
+    const double TileGap = 5;
+    static double BaseWidth => Tiled ? WidgetBase.TileHeight + TileGap : SlotWidth;
+    readonly Border? _tile;
 
     public event Action? Clicked;
     public event Action? MiddleClicked;
@@ -431,12 +445,23 @@ public sealed class AppItem : Grid
     public AppItem(string? key)
     {
         Key = key;
-        Width = SlotWidth;
+        Width = BaseWidth;
         Height = WidgetBase.TileHeight;
         Background = Brushes.Transparent;
         Cursor = Cursors.Hand;
         _bg = new Border { CornerRadius = new CornerRadius(10), Margin = new Thickness(1, 3, 1, 3), Opacity = 0 };
         _bg.Bg("Tile.Hover");
+        if (Tiled)
+        {
+            // Reference look: every app sits in its own tile (18 % black, hairline edge), like the widgets.
+            _tile = new Border { CornerRadius = new CornerRadius(WidgetBase.TileRadius), Margin = new Thickness(TileGap / 2, 0, TileGap / 2, 0) };
+            _tile.Bg("Tile.Background");
+            _tile.SetResourceReference(Border.BorderBrushProperty, "Tile.Border");
+            _tile.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
+            _bg.Margin = _tile.Margin;
+            _bg.CornerRadius = _tile.CornerRadius;
+            Children.Add(_tile);
+        }
         _content.HorizontalAlignment = HorizontalAlignment.Center;
         _content.VerticalAlignment = VerticalAlignment.Center;
         _content.Margin = new Thickness(0, 0, 0, 1);
@@ -465,7 +490,11 @@ public sealed class AppItem : Grid
         _dot.Visibility = windows > 0 ? Visibility.Visible : Visibility.Collapsed;
         _dot.Width = windows > 1 ? 8 : 3;
         _dot.Bg(flashing ? "Sys.Orange" : "Accent");
+        // Like the macOS dock: an app asking for attention bounces once.
+        if (flashing && !_flashing) Bounce();
+        _flashing = flashing;
     }
+    bool _flashing;
 
     public void SetActive(bool active)
     {
@@ -487,12 +516,12 @@ public sealed class AppItem : Grid
         _scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         _scale.ScaleX = _scale.ScaleY = s;
-        Width = SlotWidth * (1 + (s - 1) * 0.75);
+        Width = BaseWidth * (1 + (s - 1) * (Tiled ? 0.35 : 0.75));
     }
 
     void Hover(bool on)
     {
-        _bg.Opacity = _active ? 1 : on && !Settings.Current.Magnification ? 0.7 : 0;
+        _bg.Opacity = _active ? 1 : on && (!Settings.Current.Magnification || Tiled) ? 0.7 : 0;
         if (Settings.Current.Magnification) return; // the strip drives scale itself (AppsWidget.Magnifier)
         var dur = TimeSpan.FromMilliseconds(on ? 140 : 180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };

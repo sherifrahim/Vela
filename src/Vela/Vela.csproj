@@ -13,7 +13,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Vela</AssemblyName>
     <RootNamespace>Vela</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Product>Vela</Product>
     <Description>A native widget dock for Windows</Description>
 
@@ -31,6 +31,11 @@
     <DebugType>none</DebugType>
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Inter Display (SIL Open Font License, see Assets/Fonts/OFL.txt). -->
+    <Resource Include="Assets/Fonts/*.ttf" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="10.0.0" />

@@ -33,3 +33,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Inter (Inter Display)
+
+https://github.com/rsms/inter — Copyright (c) 2016 The Inter Project Authors.
+Bundled as `src/Vela/Assets/Fonts/InterDisplay-*.ttf` (embedded in Vela.exe) under the SIL Open Font License 1.1;
+the full licence text is `src/Vela/Assets/Fonts/OFL.txt` and is copied next to Vela.exe in release builds.

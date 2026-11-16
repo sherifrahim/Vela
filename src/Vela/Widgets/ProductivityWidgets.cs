@@ -90,6 +90,17 @@ public abstract class TimerTileBase : WidgetBase
 
     protected abstract void TogglePlay();
 
+    /// <summary>Tell Vela Island about a running countdown (endsAt) or stopwatch (since); null + null removes it.</summary>
+    protected void PublishIsland(DateTime? endsAt, DateTime? since)
+    {
+        if (IsPreview) return;
+        Island.SetTimer(endsAt == null && since == null ? null : new TimerActivity(Instance.Id, Label.Text, ColorKey, endsAt, since, TogglePlay, OpenCardFromIsland), Instance.Id);
+    }
+
+    void OpenCardFromIsland() { if (BuildCard() != null) OpenCard(); }
+
+    protected override void OnDetach() { base.OnDetach(); if (!IsPreview) Island.SetTimer(null, Instance.Id); }
+
     protected void SetPlaying(bool playing) =>
         ((TextBlock)PlayButton.Content).Text = playing ? Glyphs.Pause : Glyphs.Play;
 
@@ -149,6 +160,7 @@ public sealed class PomodoroWidget : TimerTileBase
         Label.Text = _phase switch { Phase.Focus => "Focus", Phase.Break => "Break", _ => "Long break" };
         Sub.Text = $"{_round}/4";
         SetPlaying(_endsAt != null);
+        PublishIsland(_endsAt, null);
     }
 
     protected override void AddMenuItems(ContextMenu menu)
@@ -176,7 +188,7 @@ public sealed class TimerWidget : TimerTileBase
         Render();
     }
 
-    protected override void OnDetach() => MouseWheel -= OnWheel;
+    protected override void OnDetach() { base.OnDetach(); MouseWheel -= OnWheel; }
 
     void OnWheel(object s, MouseWheelEventArgs e)
     {
@@ -205,6 +217,7 @@ public sealed class TimerWidget : TimerTileBase
     {
         Time.Text = Fmt.Countdown(_endsAt is { } end ? end - DateTime.Now : _left);
         SetPlaying(_endsAt != null);
+        PublishIsland(_endsAt, null);
     }
 
     protected override double CardWidth => 300;
@@ -252,6 +265,7 @@ public sealed class StopwatchWidget : TimerTileBase
         Time.Text = Fmt.Countdown(Elapsed);
         Sub.Text = _laps.Count > 0 ? $"lap {_laps.Count}" : "";
         SetPlaying(_since != null);
+        PublishIsland(null, _since is { } s ? s - _acc : null);
     }
 
     protected override double CardWidth => 300;

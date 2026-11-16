@@ -4,6 +4,56 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-16 — Claude (Opus 5.5) — session 4: release 0.3.0, lumabar deep-dive, premium pass, Vela Island
+
+**Released** v0.3.0 (github.com/sherifrahim/Vela/releases/tag/v0.3.0) before this work.
+
+**Research (lumabar.xyz, read in the owner's Chrome)** — findings now driving the design:
+- Their UI font "lumabar UI" is **SF Pro Display** (not licensable for Windows) → Vela bundles **Inter Display**
+  (OFL, `Assets/Fonts`, `Font.UI` / `UI.Font`), the closest open match.
+- Hero dock CSS (tile 64 px): bar radius 21.6 = tile radius 17.6 + padding 4; tiles `rgba(0,0,0,.18)` +
+  1 px `rgba(255,255,255,.12)`; glass = canvas blur + `rgba(20,20,20,.4)` + inset shadows
+  (0 -10 24 rgba(0,0,0,.28), 0 10 24 rgba(255,255,255,.04)); app icons 37/64 of the tile, **each app in its own tile**.
+- Type at tile 64: labels 10.5/600 (+0.16 px tracking), secondary 9.5/400 at 55 % white, values 11/700 tabular,
+  clock 17/600, weekday 10/700 uppercase red +0.08 em, big numbers 19/500. Vela's scale follows ×0.656.
+- 86 widget renders were studied (kept in the agent scratchpad only, never committed).
+
+**Changed (committed as 0.4.0)**
+- Inter Display bundled + type scale reworked (semibold values, medium secondary, tabular numerals).
+- Liquid Glass palette retuned to the measured values; new `Bar.Shade` inner-shading layer.
+- App tiles (`AppTiles`, default on), pinned/running divider, attention bounce.
+- **Vela Island** (`Views/IslandWindow.cs`, `Island` hub, setting `Island`): black pill at the top of the main
+  display for timers (Pomodoro/Timer/Stopwatch publish via `TimerTileBase.PublishIsland`), music, volume HUD,
+  power plug/unplug; hover expands (190 ms); hides in fullscreen.
+- New widgets (`Widgets/ReferenceWidgets.cs`): weather.status, weather.hourly, weather.forecast, clock.flip,
+  clock.analog, clock.world, topcpu, topram, downloads (stack). Unconnected Claude/Stripe/GitHub tiles show a
+  labelled sample instead of dashes.
+- `Vela.exe --render <dir>` (`Views/RenderCatalog.cs`): dock + catalogue + island to PNGs off-screen.
+- Fix: the shared ticker paused when *any* display went fullscreen (froze the other display's clock); now only
+  when all docks are hidden.
+- Third-party notices: Inter OFL added; `publish.ps1` copies `Inter-OFL.txt`.
+
+**Verified**
+- Builds 0 errors; no ERROR lines. `--render` output reviewed: dock, all 53 catalogue widgets, island
+  (timer compact/expanded, volume, power) look right.
+- Idle (2 docks, adaptive heartbeat, island): 94 ms CPU / 20 s (~0.47 % of a core), WS 30 MB.
+
+**Not verified** (owner had an Unreal Engine app fullscreen on display 1 the whole session — the main dock and
+the island were hidden; no synthetic input was sent)
+- Island live behaviour (music, hover expand, click), app tiles + magnification feel on the main display,
+  Downloads card, Top CPU/RAM values, adaptive light mode.
+
+**Next up**
+1. Hand-check the island and the main dock when display 1 is free; tune `IslandWindow` sizes.
+2. Idle CPU crept to ~0.47 %: profile `AdaptiveBackdrop` heartbeat (2.5 s) and `TopProcessesWidget` (10 s,
+   `Process.GetProcesses`); consider a 5 s heartbeat and skipping when the strip hash is unchanged.
+3. Port more reference renders: battery core / gauge, temperature, day timeline, stock watchlist, now-playing bar,
+   GitHub activity grid, total revenue; WPF has no letter-spacing, so emulate tracking only where it matters
+   (weekday labels) with a custom glyph-run element if needed.
+4. App folders (several apps in one tile with a 2×2 mini-icon preview, like the reference "group" tile).
+
+---
+
 ## 2026-11-16 — Claude (Opus 5.5) — session 3: OpenTaskbar ideas, live drag, previews, jump lists, adaptive theme, auto-hide
 
 **Owner asks:** take the good parts of github.com/alztrk/opentaskbar (MIT); live drag-and-drop rearranging;

@@ -23,6 +23,8 @@
                 <Grid>
                     <Border x:Name="Tint" CornerRadius="16" Margin="-3"
                             Background="{DynamicResource Bar.Background}" />
+                    <Border x:Name="Shade" CornerRadius="16" Margin="-3" IsHitTestVisible="False"
+                            Background="{DynamicResource Bar.Shade}" />
                     <Border x:Name="Sheen" CornerRadius="16" Margin="-3" IsHitTestVisible="False"
                             Background="{DynamicResource Bar.Sheen}" />
                     <!-- Liquid Glass: a specular rim just inside the edge. -->

@@ -39,10 +39,14 @@ Vela.exe --quit            # close a running dock cleanly (restores the taskbar)
 Vela.exe --widgets         # open the widget picker in the running dock
 Vela.exe --settings        # open Settings in the running dock
 Vela.exe --restore-taskbar # emergency: put the Windows taskbar back
+Vela.exe --render <dir> [--theme glass|black|white|frost|midnight]  # dock + every widget + island to PNGs, off-screen
 powershell -File tools/publish.ps1                      # self-contained Release build → ./publish/win-x64
 ```
 
 Visual checks (no UI automation needed):
+**Prefer `--render`** (off-screen PNGs of the dock layout, the whole widget catalogue and Vela Island; it never
+touches the screen or the taskbar, so it works even while the owner is gaming). Run it from a separate build output
+(`dotnet build -o <dir>`) while the dock is running, because the running exe is locked.
 `tools/screenshot.ps1 -Out shot.png -CropBottom 140` captures the dock strip; `tools/vela-windows.ps1`
 lists Vela's windows, rects and clip regions. Logs: `%LOCALAPPDATA%\Vela\logs\vela.log`.
 

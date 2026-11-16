@@ -65,10 +65,10 @@ public abstract class UsageTileBase : WidgetBase
         for (int r = 0; r < 3; r++)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(11.5) });
-            _labels[r] = Text("", 8.5, FontWeights.Bold).Row(r);
-            _resets[r] = Text("", 7, null, "Text.Secondary").Row(r).Col(2).Right();
+            _labels[r] = Text("", 8, FontWeights.SemiBold).Row(r);
+            _resets[r] = Text("", 7, FontWeights.Medium, "Text.Secondary").Row(r).Col(2).Right();
             _resets[r].Margin = new Thickness(0, 0, 3, 0);
-            _values[r] = Text("", 8.5, FontWeights.Bold).Row(r).Col(3).Right();
+            _values[r] = Text("", 8.25, FontWeights.Bold).Row(r).Col(3).Right();
             grid.Children.Add(_labels[r]); grid.Children.Add(_resets[r]); grid.Children.Add(_values[r]);
             if (r < 2)
             {
@@ -91,6 +91,12 @@ public abstract class UsageTileBase : WidgetBase
         if (r < 2 && pct is { } v) _setters[r](v / 100);
     }
 
+    /// <summary>Dim the limit rows when they show sample values.</summary>
+    protected void SetSample(bool sample)
+    {
+        for (int r = 0; r < 2; r++) { _labels[r].Opacity = _values[r].Opacity = sample ? 0.55 : 1; _resets[r].Fg(sample ? "Accent" : "Text.Secondary"); }
+    }
+
     protected static string ShortReset(DateTimeOffset? at)
     {
         if (at == null) return "";
@@ -110,9 +116,12 @@ public sealed class ClaudeWidget : UsageTileBase
     protected override void Render()
     {
         var c = Svc.Claude;
-        string noLimits = c.IsConnected ? "" : "sign in";
-        SetRow(0, "Session", c.Session?.Percent, c.Session == null ? noLimits : ShortReset(c.Session.ResetsAt));
-        SetRow(1, "Weekly", c.Weekly?.Percent, c.Weekly == null ? noLimits : ShortReset(c.Weekly.ResetsAt));
+        // Without a Claude Code sign-in the limit rows show a clearly-labelled sample (like the reference app)
+        // instead of empty dashes; the card explains how to connect.
+        bool sample = c.Session == null && c.Weekly == null;
+        SetRow(0, "Session", sample ? 34 : c.Session?.Percent, sample ? "sample" : c.Session == null ? "" : ShortReset(c.Session.ResetsAt));
+        SetRow(1, "Weekly", sample ? 21 : c.Weekly?.Percent, sample ? "connect" : c.Weekly == null ? "" : ShortReset(c.Weekly.ResetsAt));
+        SetSample(sample);
         SetRow(2, c.TopModel ?? "Tokens", null, c.TopModel != null ? "most used" : "this week", Fmt.Tokens(c.TopModel != null ? c.TopModelTokens : c.TokensWeek));
         ToolTip = c.Error;
     }
@@ -233,8 +242,9 @@ public sealed class StripeWidget : WidgetBase
     void Render()
     {
         var s = Svc.Stripe;
-        _value.Text = s.IsConnected ? (s.LastUpdated != null ? s.Display : "…") : "$—";
-        _sub.Text = !s.IsConnected ? "connect Stripe" : s.Error ?? (s.TestMode ? "test mode · 30 days" : "net revenue · 30 days");
+        _value.Text = s.IsConnected ? (s.LastUpdated != null ? s.Display : "…") : "$5,336";
+        _value.Opacity = s.IsConnected ? 1 : 0.5;
+        _sub.Text = !s.IsConnected ? "sample · click to connect" : s.Error ?? (s.TestMode ? "test mode · 30 days" : "net revenue · 30 days");
     }
 
     protected override double CardWidth => 360;
@@ -273,8 +283,9 @@ public sealed class GitHubWidget : WidgetBase
     void Render()
     {
         var g = Svc.GitHub;
-        _count.Text = !g.IsConnected ? "—" : g.Items.Count >= 50 ? "50+" : g.Items.Count.ToString();
-        _sub.Text = !g.IsConnected ? "connect GitHub" : g.Error ?? "unread";
+        _count.Text = !g.IsConnected ? "7" : g.Items.Count >= 50 ? "50+" : g.Items.Count.ToString();
+        _count.Opacity = g.IsConnected ? 1 : 0.5;
+        _sub.Text = !g.IsConnected ? "sample · click to connect" : g.Error ?? "unread";
     }
 
     protected override double CardWidth => 380;
@@ -381,7 +392,9 @@ public sealed class WeatherWidget : WidgetBase
     }
 
     protected override double CardWidth => 380;
-    protected override UIElement BuildCard()
+    protected override UIElement BuildCard() => WeatherCard();
+
+    internal static UIElement WeatherCard()
     {
         var w = Svc.Weather;
         if (!w.Configured) return V(Card.Header("Weather"), Text("Pick your city in Settings → Weather.", 13, null, "Text.Secondary"),

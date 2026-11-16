@@ -184,9 +184,9 @@ public sealed class VolumeWidget : WidgetBase
         var iconHost = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(7.5), Child = _icon, Cursor = Cursors.Hand, Margin = new Thickness(0, 0, 6, 0) }.Bg("Fill.Control");
         iconHost.MouseLeftButtonUp += (_, e) => { e.Handled = true; Svc.Speakers.ToggleMute(); };
         iconHost.ToolTip = "Mute";
-        _name = Text("", 9, FontWeights.Bold);
+        _name = Text("", 8.5, FontWeights.SemiBold);
         _name.MaxWidth = 100;
-        _pct = Text("", 8, FontWeights.SemiBold, "Text.Secondary");
+        _pct = Text("", 7.5, FontWeights.Medium, "Text.Secondary");
         _slider = Slider(0, v => { if (!_syncing) Svc.Speakers.SetVolume(v); _pct.Text = $"{v:0}%"; });
         _slider.Width = 142;
         var head = Columns("auto,*,auto", iconHost, _name, _pct);

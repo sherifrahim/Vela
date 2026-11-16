@@ -160,7 +160,7 @@ public sealed class BatteryWidget : WidgetBase
         Tile.Padding = new Thickness(0);
         Tile.BorderThickness = new Thickness(0);
         _bolt = new BoltMark { Width = 6, Height = 9, Margin = new Thickness(0, 0, 2.5, 0) };
-        _pct = Text("", 11.5, FontWeights.Bold, "OnAccent");
+        _pct = Text("", 11, FontWeights.SemiBold, "OnAccent");
         var g = new Grid();
         // A few faint sparkles, like the reference tile.
         foreach (var (x, y, d) in new[] { (7.0, 6.0, 2.0), (31.0, 5.0, 1.6), (35.0, 9.5, 1.3), (20.0, 35.0, 1.6), (9.0, 31.0, 1.2) })

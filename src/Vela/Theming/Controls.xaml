@@ -7,7 +7,8 @@
     <SolidColorBrush x:Key="Fill.Control" Color="#2C2C2E" />
     <SolidColorBrush x:Key="Accent" Color="#0A84FF" />
 
-    <FontFamily x:Key="Font.UI">Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <!-- Inter Display (SIL OFL, bundled in Assets/Fonts) is the closest open match to the reference app's SF Pro Display. -->
+    <FontFamily x:Key="Font.UI">pack://application:,,,/Vela;component/Assets/Fonts/#Inter Display, Segoe UI Variable Display, Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- ===== Buttons ===== -->

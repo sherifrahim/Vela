@@ -18,6 +18,18 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Off-screen render of the dock + every widget to PNGs (agents' visual checks): no window, no taskbar change.
+        int ri = Array.IndexOf(e.Args, "--render");
+        if (ri >= 0)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            int ti = Array.IndexOf(e.Args, "--theme");
+            try { RenderCatalog.Run(ri + 1 < e.Args.Length ? e.Args[ri + 1] : "render", ti >= 0 && ti + 1 < e.Args.Length ? e.Args[ti + 1] : null); }
+            catch (Exception ex) { Log.Error("Render failed", ex); }
+            Shutdown();
+            return;
+        }
+
         if (e.Args.Contains("--restore-taskbar"))
         {
             TaskbarController.EmergencyRestore();
@@ -77,6 +89,7 @@ public partial class App : Application
 
         _dock = new DockWindow();
         _dock.Show();
+        Views.IslandWindow.Sync();
 
         // Startup allocations are done; hand the pages back to Windows.
         var trim = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };

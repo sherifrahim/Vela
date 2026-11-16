@@ -30,7 +30,8 @@ public static class Glyphs
 /// <summary>Code-side UI builders. Brushes use SetResourceReference so theme switches are live.</summary>
 public static class UI
 {
-    public static readonly FontFamily Font = new("Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI");
+    /// <summary>Inter Display (bundled, SIL OFL) with Segoe fallbacks. Closest open match to SF Pro Display.</summary>
+    public static readonly FontFamily Font = new(new Uri("pack://application:,,,/Vela;component/"), "./Assets/Fonts/#Inter Display, Segoe UI Variable Display, Segoe UI");
     public static readonly FontFamily IconFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
 
     public static T Fg<T>(this T e, string brushKey) where T : FrameworkElement
@@ -77,15 +78,16 @@ public static class UI
             TextWrapping = TextWrapping.NoWrap,
         };
         TextOptions.SetTextFormattingMode(t, TextFormattingMode.Display);
+        System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular); // digits don't jiggle as values tick
         return t.Fg(brush);
     }
 
     /// <summary>Tile caption ("Screen Time", "Session"...).</summary>
-    public static TextBlock Caption(string text, string brush = "Text.Secondary", double size = 8.5) => Text(text, size, FontWeights.SemiBold, brush);
+    public static TextBlock Caption(string text, string brush = "Text.Secondary", double size = 8) => Text(text, size, FontWeights.SemiBold, brush);
     /// <summary>Section label inside cards and windows ("Today", "Feels like"...).</summary>
     public static TextBlock Label(string text, string brush = "Text.Secondary") => Text(text, 11, FontWeights.SemiBold, brush);
     /// <summary>Tile headline value ("2h 24m", "25:00"...).</summary>
-    public static TextBlock Value(string text, double size = 16) => Text(text, size, FontWeights.Bold);
+    public static TextBlock Value(string text, double size = 15.5) => Text(text, size, FontWeights.SemiBold);
 
     public static TextBlock Icon(string glyph, double size = 14, string brush = "Text.Primary")
     {

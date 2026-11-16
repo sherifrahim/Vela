@@ -59,10 +59,10 @@ public static class Palettes
     /// <summary>Clear glass: wallpaper shows through, frosted, with a bright rim highlight.</summary>
     public static readonly Palette LiquidGlass = new(
         "glass", "Liquid Glass", false, BackdropKind.Blur,
-        Bar: C(0x38202428), BarBorderTop: C(0x73FFFFFF), BarBorderBottom: C(0x1AFFFFFF), Sheen: C(0x1CFFFFFF),
-        Tile: C(0x330A0C10), TileHover: C(0x4D16181E), TileBorder: C(0x1AFFFFFF),
-        Text: C(0xFFFFFFFF), TextSecondary: C(0xBFFFFFFF), TextTertiary: C(0x73FFFFFF),
-        Track: C(0x40FFFFFF), Control: C(0x33FFFFFF), ControlHover: C(0x4DFFFFFF),
+        Bar: C(0x66141414), BarBorderTop: C(0x40FFFFFF), BarBorderBottom: C(0x14FFFFFF), Sheen: C(0x0BFFFFFF),
+        Tile: C(0x2E000000), TileHover: C(0x3D000000), TileBorder: C(0x1FFFFFFF),
+        Text: C(0xFFFFFFFF), TextSecondary: C(0x8CFFFFFF), TextTertiary: C(0x59FFFFFF),
+        Track: C(0x2EFFFFFF), Control: C(0x24FFFFFF), ControlHover: C(0x38FFFFFF),
         Flyout: C(0xFF1E2024), FlyoutBorder: C(0x40FFFFFF), Divider: C(0x26FFFFFF),
         DarkRed, DarkGreen, DarkOrange, DarkYellow, DarkPurple);
 
@@ -116,6 +116,17 @@ public static class ThemeManager
         return g;
     }
 
+    static Brush Shade(bool light)
+    {
+        var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+        g.GradientStops.Add(new GradientStop(light ? Color.FromArgb(0x38, 255, 255, 255) : Color.FromArgb(0x0B, 255, 255, 255), 0));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 0.42));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.58));
+        g.GradientStops.Add(new GradientStop(light ? Color.FromArgb(0x16, 0, 0, 0) : Color.FromArgb(0x47, 0, 0, 0), 1));
+        g.Freeze();
+        return g;
+    }
+
     /// <summary>Size multiplier for S / M / L.</summary>
     public static double SizeScale => Settings.Current.Size switch { "S" => 0.86, "L" => 1.16, _ => 1.0 };
 
@@ -164,6 +175,8 @@ public static class ThemeManager
         sheen.Freeze();
         r["Bar.Sheen"] = sheen;
         r["Bar.Rim"] = Liquid ? Rim(0x9C, 0x14, 0x40) : Brushes.Transparent;
+        // Inner shading (the reference bar: a faint light from the top edge, a soft shadow rising from the bottom).
+        r["Bar.Shade"] = Shade(p.IsLight);
 
         var tile = TileOverride(s.WidgetStyle) ?? (p.Tile, p.TileHover, p.TileBorder);
         if (s.GlassTiles && GlassOn)
@@ -206,7 +219,7 @@ public static class ThemeManager
     {
         "black" => (Color.FromRgb(0x16, 0x16, 0x18), Color.FromRgb(0x20, 0x20, 0x23), Color.FromArgb(0x1A, 255, 255, 255)),
         "white" => (Color.FromRgb(0xF4, 0xF4, 0xF6), Color.FromRgb(0xEA, 0xEA, 0xEE), Color.FromArgb(0x14, 0, 0, 0)),
-        "glass" => (Color.FromArgb(0x33, 0x0A, 0x0C, 0x10), Color.FromArgb(0x4D, 0x16, 0x18, 0x1E), Color.FromArgb(0x1A, 255, 255, 255)),
+        "glass" => (Color.FromArgb(0x2E, 0, 0, 0), Color.FromArgb(0x3D, 0, 0, 0), Color.FromArgb(0x1F, 255, 255, 255)),
         _ => null,
     };
 }

@@ -62,7 +62,8 @@ Todo, roughly by value:
 - [ ] Do Not Disturb toggle (Focus Assist: `WNF`/quiet hours APIs — research), Keyboard (osk.exe), Language (keyboard layout switch)
 - [ ] Top CPU / Top RAM tiles (per-process CPU% needs two samples; reuse SystemMonitor ticks)
 - [ ] Temperature (WMI MSAcpi_ThermalZoneTemperature needs admin → research LibreHardwareMonitor-style alternatives)
-- [ ] Flip clock, analog clock, world clocks, segment clock, "Today", clock & weather, 7 days
+- [x] Flip clock, analog minimal, world clocks, weather status, hourly, today & forecast, Top CPU / Top RAM
+- [ ] Segment clock, clock & weather, 7 days, battery core / gauge, temperature, day timeline, stock watchlist
 - [ ] Now Playing compact + bar variants; per-app volume mixer card (IAudioSessionManager2)
 - [ ] Quick toggles: hotspot, airplane, energy saver, Ethernet status, user-selectable toggles
 - [ ] Weather details / hourly / today & forecast / status tiles (service already has the data)
@@ -75,6 +76,11 @@ Todo, roughly by value:
 - [ ] Stocks: watchlist + chart (Finnhub key)
 - [ ] Social: YouTube (API key), X, TikTok, Instagram
 - [ ] Wallpaper gallery
+
+## Vela Island & macOS extras
+- [~] Vela Island: timers, music, volume HUD, power; hover expand (rendered off-screen; live check pending)
+- [x] App tiles, pinned/running divider, attention bounce, Downloads stack widget
+- [ ] App folders (2×2 mini-icon tile), recent-apps section, minimize-to-dock hint
 
 ## P2 — glass & animation
 - [ ] Live Liquid Glass: Windows.Graphics.Capture of the strip behind the dock → D3D11/Win2D refraction

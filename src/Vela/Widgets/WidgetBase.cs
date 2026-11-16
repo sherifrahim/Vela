@@ -153,6 +153,9 @@ public abstract class WidgetBase : Grid, IDisposable
     }
 
     // ---------- plumbing ----------
+    /// <summary>Off-screen rendering (Vela.exe --render): run OnAttach + the first tick without a window.</summary>
+    internal void AttachForRender() => Attach();
+
     void Attach()
     {
         if (_attached) return;

@@ -26,6 +26,8 @@ public sealed class AppSettings
     public bool DesktopCorner { get; set; } = true;   // peek / show-desktop sliver at the far end
     public string Displays { get; set; } = "all";     // all (a dock on every display) | primary
     public bool Magnification { get; set; } = true;   // macOS-style icon magnification on hover
+    public bool AppTiles { get; set; } = true;        // each app icon in its own tile (reference look); false = loose icons
+    public bool Island { get; set; } = true;          // Vela Island: Dynamic-Island-style activity pill at the top of the main display
     public double MagnifyAmount { get; set; } = 1.45; // largest icon scale (1.1–1.6)
     public bool WindowPreviews { get; set; } = true;  // live thumbnails when hovering a running app
     public bool AdaptiveTheme { get; set; } = true;   // each dock matches what is on its display (colours + light/dark)

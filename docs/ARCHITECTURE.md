@@ -124,6 +124,17 @@ by WPF's size-to-content pass, which used to drop cards mid-screen), centred ove
 the bar edge, clamped to that display. `FlyoutWindow.Navigate(content)` swaps a card's content in place
 (Control Centre → Wi-Fi list). Memory is trimmed 4 s after the last card closes.
 
+**Typography**: Inter Display (bundled, OFL) as `Font.UI` / `UI.Font`, tabular numerals on every `UI.Text`.
+The reference app uses SF Pro Display; its measured type scale is documented in docs/PROGRESS.md (session 4).
+
+**Vela Island** (`Views/IslandWindow.cs`): a layered, non-activating window at the top centre of the primary
+display; a black pill (`_pill`) that animates between compact (30 DIP) and expanded (112 DIP) on hover. Content
+priority: HUD (volume change, power plug/unplug, 1.6 s) > timers (`Island` hub, fed by `TimerTileBase.PublishIsland`)
+> music (`Svc.Media`). Ticks only while a timer is running; hides when the primary display is fullscreen.
+
+**Off-screen rendering** (`Views/RenderCatalog.cs`, `Vela.exe --render <dir>`): builds widgets with
+`preview: true`, runs `AttachForRender`, pumps the dispatcher 3 s, renders at 2× with RenderTargetBitmap.
+
 **Live drag-and-drop** (`UI/LiveReorder`): the dragged widget / icon follows the pointer via its own
 TranslateTransform; when the order changes, neighbours glide to their new slots (FLIP: snapshot visual X →
 reorder → layout → animate the difference to 0, 170 ms). Used by `DockWindow` (widgets) and `AppsWidget` (pins).

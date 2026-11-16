@@ -25,6 +25,9 @@ public static class WidgetRegistry
         new("dayprogress", "Day Progress", "Clocks", () => new ProgressRingWidget(ProgressRingWidget.Span.Day)),
         new("monthprogress", "Month Progress", "Clocks", () => new ProgressRingWidget(ProgressRingWidget.Span.Month)),
         new("yearprogress", "Year Progress", "Clocks", () => new YearDotsWidget()),
+        new("clock.flip", "Flip Clock", "Clocks", () => new FlipClockWidget()),
+        new("clock.analog", "Analog Minimal", "Clocks", () => new AnalogClockWidget()),
+        new("clock.world", "World Clocks", "Clocks", () => new WorldClocksWidget()),
 
         // Productivity
         new("screentime", "Screen Time", "Productivity", () => new ScreenTimeWidget()),
@@ -38,6 +41,8 @@ public static class WidgetRegistry
         // System
         new("sysstats", "System Stats", "System", () => new SystemStatsWidget()),
         new("sysmon", "System Monitor", "System", () => new SystemMonitorWidget()),
+        new("topcpu", "Top CPU", "System", () => new TopProcessesWidget(true)),
+        new("topram", "Top RAM", "System", () => new TopProcessesWidget(false)),
         new("cpu", "CPU", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Cpu)),
         new("ram", "RAM", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Ram)),
         new("network", "Network", "System", () => new NetworkWidget()),
@@ -56,6 +61,7 @@ public static class WidgetRegistry
         new("apps", "Apps", "Apps & Files", () => new AppsWidget()),
         new("storage", "Storage", "Apps & Files", () => new StorageWidget()),
         new("recyclebin", "Recycle Bin", "Apps & Files", () => new RecycleBinWidget()),
+        new("downloads", "Downloads Stack", "Apps & Files", () => new DownloadsWidget()),
 
         // Media & Audio
         new("nowplaying", "Now Playing", "Media & Audio", () => new NowPlayingWidget()),
@@ -76,6 +82,9 @@ public static class WidgetRegistry
         // Weather
         new("weather", "Weather", "Weather", () => new WeatherWidget()),
         new("weather.sun", "Sunrise & Sunset", "Weather", () => new SunWidget()),
+        new("weather.status", "Weather Status", "Weather", () => new WeatherStatusWidget()),
+        new("weather.hourly", "Hourly", "Weather", () => new HourlyWidget()),
+        new("weather.forecast", "Today & Forecast", "Weather", () => new ForecastWidget()),
 
         // Online
         new("github", "GitHub", "Online & Mail", () => new GitHubWidget(), "github"),
