@@ -379,8 +379,8 @@
     <Style TargetType="ToolTip">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="HasDropShadow" Value="False" />
-        <Setter Property="Placement" Value="Top" />
-        <Setter Property="VerticalOffset" Value="-6" />
+        <Setter Property="Placement" Value="{DynamicResource ToolTip.Placement}" />
+        <Setter Property="VerticalOffset" Value="{DynamicResource ToolTip.Offset}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">

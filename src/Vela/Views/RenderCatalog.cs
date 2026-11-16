@@ -49,6 +49,20 @@ public static class RenderCatalog
 
         Save(Backdrop(dock), Path.Combine(dir, "dock.png"));
         Save(Backdrop(grid), Path.Combine(dir, "catalog.png"));
+        // 3) A few cards (solid, as they open over the dock).
+        var cards = new WrapPanel { Width = 1120 };
+        foreach (var type in new[] { "claude", "codex", "terminal", "volume", "quicktoggles", "clock" })
+        {
+            var w = catalog.FirstOrDefault(c => c.Instance?.Type == type);
+            if (w?.CardForRender() is not { } content) continue;
+            var card = new Border { Width = 340, CornerRadius = new CornerRadius(22), Padding = new Thickness(18), Margin = new Thickness(10), Child = content, VerticalAlignment = VerticalAlignment.Top };
+            card.Bg("Flyout.Background");
+            card.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
+            card.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
+            cards.Children.Add(card);
+        }
+        Pump(TimeSpan.FromSeconds(1));
+        Save(Backdrop(cards), Path.Combine(dir, "cards.png"));
         var island = new StackPanel();
         foreach (var (name, view, big) in IslandWindow.Previews())
             island.Children.Add(V(Text(name, 9, FontWeights.SemiBold, "Text.Secondary").Margin(4, 0, 0, 4), IslandWindow.PreviewPill(view, big)).Margin(0, 0, 0, 14));

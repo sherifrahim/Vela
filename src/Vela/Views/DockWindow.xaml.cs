@@ -329,6 +329,7 @@ public partial class DockWindow : GlassWindow
     {
         base.OnSourceInitialized(e);
         HwndSource.FromHwnd(Hwnd).AddHook(WndProc);
+        SyncHotkeys();
         _appBar = new AppBar(Hwnd);
         _appBar.Register();
         _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
@@ -437,7 +438,7 @@ public partial class DockWindow : GlassWindow
             case "adaptive": ThemeManager.Apply(); SetupAdaptive(); break;
             case "autohide": QueueReposition(); SetupAutoHide(); break;
             case "island": if (IsPrimary) IslandWindow.Sync(); break;
-            case "dock": ApplyLook(); break;
+            case "dock": ApplyLook(); ThemeManager.ApplyEdge(); SyncHotkeys(); break;
             case "widgets": if (_origin != this && _origin != null || _origin == null && !IsPrimary) BuildWidgets(); break;
             case "displays": SyncDisplays(); break;
             case "taskbar": Svc.Taskbar.Apply(Settings.Current.TaskbarMode); QueueReposition(); break;
@@ -690,7 +691,7 @@ public partial class DockWindow : GlassWindow
         if (!_reordering && _pressCandidate != null && e.LeftButton == MouseButtonState.Pressed)
         {
             var q = e.GetPosition(Items);
-            if (Math.Abs(q.X - _dragStart.X) > DragThreshold) BeginReorder();
+            if (Math.Abs(q.X - _dragStart.X) > DragThreshold && !Settings.Current.LockDock) BeginReorder();
         }
         if (_reorderItem == null || _live == null) return;
         // Live: the widget follows the pointer, the others glide out of its way.
@@ -714,7 +715,7 @@ public partial class DockWindow : GlassWindow
 
     void OnBarMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (WidgetBase.EditMode || FindWidget(e.OriginalSource as DependencyObject) != null) return;
+        if (WidgetBase.EditMode || Settings.Current.LockDock || FindWidget(e.OriginalSource as DependencyObject) != null) return;
         if (e.OriginalSource is not (Border or StackPanel or Grid or DockRow)) return;
         _barDragging = true;
         _barDragMoved = false;
@@ -884,6 +885,11 @@ public partial class DockWindow : GlassWindow
             _appBar?.Register();
             QueueReposition();
         }
+        else if (msg == WM_HOTKEY && wParam.ToInt32() == ShellHotkeyId)
+        {
+            WinActions.LaunchShell(WinActions.ShellKind.PowerShell, admin: true);
+            handled = true;
+        }
         else if (msg == CommandMessage)
         {
             if (wParam.ToInt32() == 1) Dispatcher.BeginInvoke(OpenWidgetPicker);
@@ -907,6 +913,25 @@ public partial class DockWindow : GlassWindow
         return IntPtr.Zero;
     }
 
+    // ------------------------------------------------------------------ global hotkeys
+
+    const int ShellHotkeyId = 0x5654; // "VT"
+    bool _shellHotkey;
+
+    /// <summary>Alt+T: PowerShell as administrator, from anywhere (owner's choice). Only the main dock owns it.</summary>
+    void SyncHotkeys()
+    {
+        if (!IsPrimary || Hwnd == IntPtr.Zero) return;
+        bool want = Settings.Current.AdminShellHotkey;
+        if (want == _shellHotkey) return;
+        if (want)
+        {
+            _shellHotkey = RegisterHotKey(Hwnd, ShellHotkeyId, MOD_ALT | MOD_NOREPEAT, 0x54 /* T */);
+            if (!_shellHotkey) Log.Warn("Alt+T is taken by another app; the admin PowerShell shortcut is off");
+        }
+        else { UnregisterHotKey(Hwnd, ShellHotkeyId); _shellHotkey = false; }
+    }
+
     /// <summary>Called from App.OnExit. Order matters: give back the screen space, then restore the taskbar.</summary>
     public void Teardown()
     {
@@ -917,6 +942,7 @@ public partial class DockWindow : GlassWindow
             if (IsPrimary)
             {
                 foreach (var d in All.Where(x => !x.IsPrimary).ToList()) { d.Teardown(); d.Close(); }
+                if (_shellHotkey) { UnregisterHotKey(Hwnd, ShellHotkeyId); _shellHotkey = false; }
                 if (Hwnd != IntPtr.Zero) Svc.Windows.Stop(Hwnd);
             }
             _appBar?.Dispose();

@@ -118,6 +118,8 @@ public abstract class WidgetBase : Grid, IDisposable
     protected virtual void OnAttach() { }
     protected virtual void OnDetach() { }
     protected virtual UIElement? BuildCard() => null;
+    /// <summary>The card content, for the off-screen renderer (--render).</summary>
+    internal UIElement? CardForRender() { try { return BuildCard(); } catch (Exception ex) { Log.Warn("Card render " + GetType().Name + ": " + ex.Message); return null; } }
     protected virtual double CardWidth => 340;
     protected virtual void OnClick() => OpenCard();
     protected virtual void OnMiddleClick() { }

@@ -73,7 +73,7 @@ public sealed class FlyoutWindow : GlassWindow
         _root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
         _root.SetResourceReference(Border.BorderThicknessProperty, "Hairline");
         RegionElement = _root;
-        LiveBackdrop = true; // frosted, macOS-style card over a live blur
+        // Solid card, like the reference (no live blur under cards).
         Content = _root;
         // Cards follow the light/dark look their dock adapted to.
         if (DockWindow.For(anchor)?.AdaptiveResources is { } rd) Resources.MergedDictionaries.Add(rd);
@@ -178,13 +178,15 @@ public static class Card
     /// <summary>Card header: optional icon badge, title, optional pill, close button.</summary>
     public static FrameworkElement Header(string title, UIElement? icon = null, string? pill = null)
     {
-        var row = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+        var row = new Grid { MinHeight = 30 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var left = new StackPanel { Orientation = Orientation.Horizontal };
+        var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (icon != null) { left.Children.Add(icon); ((FrameworkElement)icon).Margin = new Thickness(0, 0, 12, 0); }
-        left.Children.Add(UI.UI.Text(title, 16, FontWeights.Bold));
+        var name = UI.UI.Text(title, 15.5, FontWeights.SemiBold);
+        name.VerticalAlignment = VerticalAlignment.Center;
+        left.Children.Add(name);
         if (pill != null)
         {
             var p = new Border { CornerRadius = new CornerRadius(9), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
@@ -193,10 +195,14 @@ public static class Card
             left.Children.Add(p);
         }
         row.Children.Add(left);
-        var close = UI.UI.CircleButton(UI.Glyphs.Close, CloseCurrentCard, 28, "Fill.Control", "Text.Secondary", 10);
+        // Reference: a plain ✕ (no button chrome) and a hairline running edge to edge under the header.
+        var close = UI.UI.GhostButton(UI.UI.Icon(UI.Glyphs.Close, 12, "Text.Secondary"), CloseCurrentCard);
+        close.Width = 28; close.Height = 28; close.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(close, 2);
         row.Children.Add(close);
-        return row;
+        var rule = new Border { Height = 1, Margin = new Thickness(-18, 14, -18, 16) };
+        rule.SetResourceReference(Border.BackgroundProperty, "Divider");
+        return UI.UI.V(row, rule);
     }
 
     static void CloseCurrentCard() => FlyoutWindow.CloseCurrent();

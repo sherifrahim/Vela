@@ -53,10 +53,10 @@ solid-colour desktops too). Recomputed on bar move/resize and on `WM_SETTINGCHAN
 Limitation: windows dragged *behind* the dock aren't reflected. Live refraction = roadmap
 (Windows.Graphics.Capture → D3D11 shader, only while something moves, like the original).
 
-Cards / picker / settings are frosted panels while `LiveBlur` is on: `GlassWindow.LiveBackdrop = true` places a
-`BackdropWindow` under `RegionElement` (re-synced after layout/moves, deferred with `Dispatcher.BeginInvoke`; cards
-sync once their slide-in settles and hide it before sliding out) and `Flyout.Background` drops to ~77 % alpha.
-With `LiveBlur` off the fills are opaque: a translucent panel that can't blur just shows text through it.
+Cards are solid (`Flyout.Background`, #181818 on the dark styles), like the reference. The picker and control panel
+are frosted while `LiveBlur` is on: `GlassWindow.LiveBackdrop = true` places a `BackdropWindow` under `RegionElement`
+(re-synced after layout/moves, deferred with `Dispatcher.BeginInvoke`) and `Panel.Background` drops to ~77 % alpha.
+With `LiveBlur` off they are opaque: a translucent panel that can't blur just shows text through it.
 Focus caveat: backdrops are never `Show()`n (`EnsureHandle` + `SWP_NOACTIVATE`); a card that loses focus to a
 "Vela Backdrop" window re-activates instead of closing.
 

@@ -46,8 +46,8 @@ public sealed class AppsWidget : WidgetBase
         _panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         if (!IsPreview) Views.DockRow.SetFill(this, true); // full-width bar: the apps sit at the screen centre
         var start = new AppItem(null) { ToolTip = "Start" };
-        // The Windows 11 Start mark, full icon size, in its own blue.
-        start.SetContent(new WindowsLogo { Colored = true, Width = AppItem.IconSize - 3, Height = AppItem.IconSize - 3 });
+        // Reference Start button: a light Windows mark on a dark rounded tile (same in every style).
+        start.SetContent(WindowsLogo.StartTile(AppItem.IconSize));
         start.Clicked += WinActions.OpenStart;
         start.MenuRequested += m =>
         {
@@ -258,6 +258,9 @@ public sealed class AppsWidget : WidgetBase
                 Settings.Current.PinnedApps.Add(new PinnedApp { Name = g.Name, LaunchPath = g.LaunchPath, TargetPath = w.ExePath, Aumid = w.Aumid });
                 Settings.Save("pins");
             }));
+        // Like the reference: a hung app (Windows says "not responding") can be ended from its menu.
+        if (g.Windows.FirstOrDefault(w => WindowTracker.IsHung(w.Hwnd)) is { } hung)
+            m.Items.Add(Item("End task (not responding)", () => WindowTracker.EndTask(hung.Hwnd)));
         if (g.Windows.Count > 0)
             m.Items.Add(Item(g.Windows.Count > 1 ? "Close all windows" : "Close window", () => { foreach (var w in g.Windows) WindowTracker.Close(w.Hwnd); }));
         m.Items.Add(new Separator());
@@ -375,7 +378,7 @@ public sealed class AppsWidget : WidgetBase
 
     void OnPanelDown(object sender, MouseButtonEventArgs e)
     {
-        if (IsPreview || EditMode) return;
+        if (IsPreview || EditMode || Settings.Current.LockDock) return; // locked: apps keep their order
         var item = ItemFrom(e.OriginalSource);
         if (item?.Key == null) return;
         _dragItem = item;
@@ -435,6 +438,9 @@ public sealed class AppsWidget : WidgetBase
 public sealed class AppItem : Grid
 {
     readonly Border _bg, _dot;
+    // Focused app (reference): a thin accent outline around the icon, drawn with the icon so it magnifies with it.
+    readonly Border _ring = new() { CornerRadius = new CornerRadius(9), BorderThickness = new Thickness(1.25), Margin = new Thickness(-4), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+    UIElement? _inner;
     readonly ContentControl _content = new() { Focusable = false, IsTabStop = false };
     readonly TranslateTransform _lift = new();
     readonly ScaleTransform _scale = new(1, 1);
@@ -454,7 +460,7 @@ public sealed class AppItem : Grid
     public event Action? HoverStarted;
     public event Action? HoverEnded;
     /// <summary>The app icon currently shown (for previews / menus).</summary>
-    public ImageSource? Icon => (_content.Content as Image)?.Source;
+    public ImageSource? Icon => (_inner as Image)?.Source;
 
     public AppItem(string? key)
     {
@@ -483,6 +489,7 @@ public sealed class AppItem : Grid
         _content.RenderTransform = new TransformGroup { Children = { _scale, _lift } };
         _dot = new Border { Width = 3, Height = 3, CornerRadius = new CornerRadius(1.5), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 1.5), Visibility = Visibility.Collapsed };
         _dot.Bg("Accent");
+        _ring.SetResourceReference(Border.BorderBrushProperty, "Accent");
         Children.Add(_bg);
         Children.Add(_content);
         Children.Add(_dot);
@@ -493,7 +500,15 @@ public sealed class AppItem : Grid
         MouseLeave += (_, _) => { Hover(false); HoverEnded?.Invoke(); };
     }
 
-    public void SetContent(UIElement e) => _content.Content = e;
+    public void SetContent(UIElement e)
+    {
+        _inner = e;
+        if (_ring.Parent is Grid old) old.Children.Remove(_ring);
+        var g = new Grid();
+        g.Children.Add(_ring);
+        g.Children.Add(e);
+        _content.Content = g;
+    }
 
     public void ClearHandlers() { Clicked = null; MiddleClicked = null; MenuRequested = null; HoverStarted = null; HoverEnded = null; }
 
@@ -513,13 +528,14 @@ public sealed class AppItem : Grid
     public void SetActive(bool active)
     {
         _active = active;
-        // Loose icons (reference / macOS): no box behind the icon; the running dot is the only state mark.
+        // Loose icons (reference): no box behind the icon; the focused app gets an accent outline instead.
         _bg.Opacity = !Tiled ? 0 : active ? 1 : IsMouseOver ? 0.7 : 0;
+        _ring.Visibility = active && !Tiled && Key != null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void InvalidateVisualTree()
     {
-        foreach (var fe in new[] { _content.Content as UIElement }) fe?.InvalidateVisual();
+        _inner?.InvalidateVisual();
     }
 
     /// <summary>Magnification (macOS dock): scale grows from the bottom edge and the slot widens so neighbours make room.</summary>

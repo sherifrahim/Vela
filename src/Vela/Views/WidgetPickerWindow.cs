@@ -42,7 +42,7 @@ public sealed class WidgetPickerWindow : GlassWindow
         RegionRadius = 26;
 
         var root = new Border { CornerRadius = new CornerRadius(26), BorderThickness = new Thickness(1), ClipToBounds = true };
-        root.Bg("Flyout.Background");
+        root.Bg("Panel.Background");
         root.SetResourceReference(Border.BorderBrushProperty, "Flyout.Border");
         RegionElement = root;
         LiveBackdrop = true;

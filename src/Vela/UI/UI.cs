@@ -25,6 +25,8 @@ public static class Glyphs
     public const string Skip = "", Reset = "", Download = "", Upload = "";
     public const string Grid = "", AllApps = "", Cpu = "", Memory = "", Network = "";
     public const string Money = "", Chart = "", Note = "", Task = "", Lock = "";
+    // Segoe Fluent / MDL2: CommandPrompt (U+E756), Shield (U+EA18).
+    public const string Terminal = "", Shield = "";
 }
 
 /// <summary>Code-side UI builders. Brushes use SetResourceReference so theme switches are live.</summary>
@@ -78,9 +80,14 @@ public static class UI
             TextWrapping = TextWrapping.NoWrap,
         };
         TextOptions.SetTextFormattingMode(t, TextFormattingMode.Display);
-        System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular); // digits don't jiggle as values tick
+        // Tabular digits only for number-like text (clocks, %, durations): digits don't jiggle as values tick. Inter's tabular
+        // set also widens punctuation such as the hyphen, so prose ("sign-in") keeps proportional figures.
+        if (NumberLike.IsMatch(text)) System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
         return t.Fg(brush);
     }
+
+    /// <summary>Digits plus the units and separators that appear in values ("12:05 PM", "2h 24m", "56%", "4.2 GB", "$15").</summary>
+    static readonly System.Text.RegularExpressions.Regex NumberLike = new(@"^[\d\s:.,%°+−–—/·hmsdwAPMKGTB$€£¥x]*$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>Tile caption ("Screen Time", "Session"...).</summary>
     public static TextBlock Caption(string text, string brush = "Text.Secondary", double size = 8) => Text(text, size, FontWeights.SemiBold, brush);
@@ -399,11 +406,28 @@ public sealed class WindowsLogo : FrameworkElement
         return g;
     }
 
+    /// <summary>Explicit fill (overrides <see cref="Colored"/> and the theme text colour).</summary>
+    public Brush? Fill { get; set; }
+
+    static Brush Frozen(Brush b) { b.Freeze(); return b; }
+    static readonly Brush TileFill = Frozen(new LinearGradientBrush(Color.FromRgb(0x3E, 0x3E, 0x40), Color.FromRgb(0x24, 0x24, 0x26), 90));
+    static readonly Brush TileEdge = Frozen(new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)));
+    static readonly Brush MarkFill = Frozen(new LinearGradientBrush(Color.FromRgb(0xF7, 0xF7, 0xF7), Color.FromRgb(0xC4, 0xC4, 0xC6), 90));
+
+    /// <summary>Start button as in the reference: a light four-pane mark on a dark rounded tile, in every style.</summary>
+    public static FrameworkElement StartTile(double size) => new Border
+    {
+        Width = size, Height = size,
+        CornerRadius = new CornerRadius(size * 0.24),
+        Background = TileFill, BorderBrush = TileEdge, BorderThickness = new Thickness(0.75),
+        Child = new WindowsLogo { Fill = MarkFill, Width = size * 0.5, Height = size * 0.5 },
+    };
+
     protected override void OnRender(DrawingContext dc)
     {
         double s = Math.Min(ActualWidth, ActualHeight), gap = s * 0.07, q = (s - gap) / 2;
         double x0 = (ActualWidth - s) / 2, y0 = (ActualHeight - s) / 2;
-        var b = Colored ? Blue : UI.Res("Text.Primary");
+        var b = Fill ?? (Colored ? Blue : UI.Res("Text.Primary"));
         for (int i = 0; i < 4; i++)
             dc.DrawRoundedRectangle(b, null, new Rect(x0 + (i % 2) * (q + gap), y0 + (i / 2) * (q + gap), q, q), q * 0.12, q * 0.12);
     }

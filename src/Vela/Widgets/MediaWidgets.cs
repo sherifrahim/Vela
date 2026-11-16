@@ -186,6 +186,10 @@ public sealed class VolumeWidget : WidgetBase
         iconHost.ToolTip = "Mute";
         _name = Text("", 8.5, FontWeights.SemiBold);
         _name.MaxWidth = 100;
+        // The device name opens the card (output devices + per-app mixer); the slider stays a slider.
+        _name.Cursor = Cursors.Hand;
+        _name.ToolTip = "Output and apps";
+        _name.MouseLeftButtonUp += (_, e) => { if (EditMode || IsPreview) return; e.Handled = true; OpenCard(); };
         _pct = Text("", 7.5, FontWeights.Medium, "Text.Secondary");
         _slider = Slider(0, v => { if (!_syncing) Svc.Speakers.SetVolume(v); _pct.Text = $"{v:0}%"; });
         _slider.Width = 142;
@@ -209,8 +213,86 @@ public sealed class VolumeWidget : WidgetBase
     protected override void AddMenuItems(ContextMenu menu)
     {
         menu.Items.Add(Item(Svc.Speakers.Muted ? "Unmute" : "Mute", Svc.Speakers.ToggleMute));
-        menu.Items.Add(Item("Volume mixer", () => WinActions.OpenSettings("apps-volume")));
+        menu.Items.Add(Item("Output and apps…", OpenCard));
         menu.Items.Add(Item("Sound settings", () => WinActions.OpenSettings("sound")));
+    }
+
+    // ---------- card: output devices + per-app mixer (reference "Audio Output") ----------
+
+    const string Headphones = "";
+    protected override double CardWidth => 340;
+
+    protected override UIElement BuildCard()
+    {
+        var apps = AudioMixer.Apps();
+        var root = new StackPanel();
+        root.Children.Add(Card.Header("Sound"));
+
+        // Output devices: click one to make it the default for every app.
+        root.Children.Add(Label("Output").Margin(0, 0, 0, 6));
+        foreach (var d in AudioMixer.OutputDevices())
+        {
+            var dev = d;
+            bool phones = System.Text.RegularExpressions.Regex.IsMatch(d.Name, "head|ear|buds|pods", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var icon = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Child = Icon(phones ? Headphones : Glyphs.Volume, 13, d.IsDefault ? "OnAccent" : "Text.Primary") }
+                .Bg(d.IsDefault ? "Accent" : "Fill.Control");
+            var name = Text(d.Name, 13, FontWeights.SemiBold);
+            name.Margin = new Thickness(11, 0, 8, 0);
+            var check = d.IsDefault ? Icon(Glyphs.Check, 12, "Accent") : new TextBlock();
+            var b = GhostButton(Columns("auto,*,auto", icon, name, check), () =>
+            {
+                if (dev.IsDefault || !AudioMixer.SetDefaultOutput(dev.Id)) return;
+                FlyoutWindow.Navigate(BuildCard()); // re-read: the app list follows the new default device
+            });
+            b.Padding = new Thickness(6, 5, 8, 5);
+            b.Margin = new Thickness(-6, 0, -8, 2);
+            root.Children.Add(b);
+        }
+
+        // Master volume for the default device.
+        var master = Slider(Svc.Speakers.Volume, v => Svc.Speakers.SetVolume(v));
+        var masterPct = Text($"{Svc.Speakers.Volume:0}%", 12, FontWeights.SemiBold, "Text.Secondary");
+        masterPct.Width = 38; masterPct.TextAlignment = TextAlignment.Right;
+        master.ValueChanged += (_, e) => masterPct.Text = $"{e.NewValue:0}%";
+        root.Children.Add(Columns("*,auto", master, masterPct).Margin(0, 8, 0, 4));
+
+        // Apps playing (or holding) audio.
+        root.Children.Add(new Border { Height = 1, Margin = new Thickness(-18, 12, -18, 12) }.Bg("Divider"));
+        root.Children.Add(Label("Apps").Margin(0, 0, 0, 6));
+        if (apps.Count == 0)
+            root.Children.Add(Text("No app is playing sound.", 12.5, null, "Text.Secondary").Margin(0, 2, 0, 6));
+        foreach (var a in apps) root.Children.Add(AppRow(a));
+
+        root.Children.Add(Card.Footer("Windows remembers app levels.", "Sound settings", () => { FlyoutWindow.CloseCurrent(); WinActions.OpenSettings("sound"); }));
+        // The rows hold Core Audio session references while the card is open; drop them when it closes.
+        root.Unloaded += (_, _) => { foreach (var a in apps) a.Release(); };
+        return root;
+    }
+
+    static FrameworkElement AppRow(AppAudio a)
+    {
+        var img = new Image { Width = 22, Height = 22 };
+        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+        FrameworkElement iconHost;
+        if (a.ExePath != null)
+        {
+            Svc.Icons.Get(a.ExePath, s => img.Dispatcher.BeginInvoke(() => img.Source = s), 64);
+            iconHost = img;
+        }
+        else iconHost = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(6), Child = Icon(a.IsSystemSounds ? Glyphs.Bell : Glyphs.Volume, 11) }.Bg("Fill.Control");
+        // Click the icon to mute that app; it fades while muted.
+        var mute = new Border { Background = Brushes.Transparent, Child = iconHost, Cursor = Cursors.Hand, ToolTip = "Mute", Margin = new Thickness(0, 0, 11, 0), VerticalAlignment = VerticalAlignment.Center };
+        void Fade() => iconHost.Opacity = a.Muted ? 0.35 : 1;
+        Fade();
+        mute.MouseLeftButtonUp += (_, e) => { e.Handled = true; a.SetMuted(!a.Muted); Fade(); };
+
+        var name = Text(a.Name, 12.5, FontWeights.SemiBold);
+        var pct = Text($"{a.Volume:0}%", 11.5, FontWeights.SemiBold, "Text.Secondary");
+        var slider = Slider(a.Volume, v => { a.SetVolume(v); pct.Text = $"{v:0}%"; Fade(); });
+        var right = V(Columns("*,auto", name, pct), slider.Margin(0, 4, 0, 0));
+        var row = Columns("auto,*", mute, right);
+        row.Margin = new Thickness(0, 0, 0, 10);
+        return row;
     }
 }
 

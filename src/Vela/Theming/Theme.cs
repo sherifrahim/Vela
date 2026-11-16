@@ -35,7 +35,7 @@ public static class Palettes
         Tile: C(0xFF161618), TileHover: C(0xFF202023), TileBorder: C(0x1AFFFFFF),
         Text: C(0xFFFFFFFF), TextSecondary: C(0x99EBEBF5), TextTertiary: C(0x55EBEBF5),
         Track: C(0xFF2C2C2E), Control: C(0xFF2C2C2E), ControlHover: C(0xFF3A3A3C),
-        Flyout: C(0xFF1C1C1E), FlyoutBorder: C(0x26FFFFFF), Divider: C(0x1FFFFFFF),
+        Flyout: C(0xFF181818), FlyoutBorder: C(0x24FFFFFF), Divider: C(0x1FFFFFFF),
         DarkRed, DarkGreen, DarkOrange, DarkYellow, DarkPurple);
 
     public static readonly Palette Midnight = new(
@@ -48,9 +48,9 @@ public static class Palettes
         DarkRed, DarkGreen, DarkOrange, DarkYellow, DarkPurple);
 
     public static readonly Palette White = new(
-        "white", "White", true, BackdropKind.Blur,
-        Bar: C(0xE6FAFAFC), BarBorderTop: C(0xFFFFFFFF), BarBorderBottom: C(0x1F000000), Sheen: C(0x00FFFFFF),
-        Tile: C(0xFFF4F4F6), TileHover: C(0xFFEAEAEE), TileBorder: C(0x14000000),
+        "white", "White", true, BackdropKind.None,
+        Bar: C(0xFFFFFFFF), BarBorderTop: C(0x14000000), BarBorderBottom: C(0x1F000000), Sheen: C(0x00FFFFFF),
+        Tile: C(0xFFF3F3F3), TileHover: C(0xFFEBEBEB), TileBorder: C(0x12000000),
         Text: C(0xFF000000), TextSecondary: C(0x993C3C43), TextTertiary: C(0x553C3C43),
         Track: C(0xFFE3E3E8), Control: C(0xFFE9E9ED), ControlHover: C(0xFFDDDDE2),
         Flyout: C(0xFFFFFFFF), FlyoutBorder: C(0x1A000000), Divider: C(0x14000000),
@@ -63,7 +63,7 @@ public static class Palettes
         Tile: C(0x2E000000), TileHover: C(0x3D000000), TileBorder: C(0x1FFFFFFF),
         Text: C(0xFFFFFFFF), TextSecondary: C(0x8CFFFFFF), TextTertiary: C(0x59FFFFFF),
         Track: C(0x2EFFFFFF), Control: C(0x24FFFFFF), ControlHover: C(0x38FFFFFF),
-        Flyout: C(0xFF1E2024), FlyoutBorder: C(0x40FFFFFF), Divider: C(0x26FFFFFF),
+        Flyout: C(0xFF181818), FlyoutBorder: C(0x24FFFFFF), Divider: C(0x1FFFFFFF),
         DarkRed, DarkGreen, DarkOrange, DarkYellow, DarkPurple);
 
     /// <summary>Light frosted glass with dark text (iOS control-centre look).</summary>
@@ -130,13 +130,23 @@ public static class ThemeManager
     /// <summary>Size multiplier for S / M / L.</summary>
     public static double SizeScale => Settings.Current.Size switch { "S" => 0.86, "L" => 1.16, _ => 1.0 };
 
+    /// <summary>Tooltips open away from the screen edge the dock sits on (above a bottom dock, below a top one).</summary>
+    public static void ApplyEdge()
+    {
+        if (Application.Current is not { } app) return;
+        bool top = Settings.Current.Edge == "top";
+        app.Resources["ToolTip.Placement"] = top ? System.Windows.Controls.Primitives.PlacementMode.Bottom : System.Windows.Controls.Primitives.PlacementMode.Top;
+        app.Resources["ToolTip.Offset"] = top ? 6.0 : -6.0;
+    }
+
     public static void Apply()
     {
         var s = Settings.Current;
+        ApplyEdge();
         Current = Palettes.Get(s.Theme);
         try { Accent = (Color)ColorConverter.ConvertFromString(s.Accent); } catch { }
-        // Glass effect: "auto" follows the style; off / frosted / liquid override it. "Match the screen" implies glass.
-        GlassOn = s.AdaptiveTheme || s.GlassEffect switch { "off" => false, "frosted" or "liquid" => true, _ => Current.Backdrop != BackdropKind.None };
+        // Glass follows the style (Black and White are solid, as in the reference); "Match the screen" only flips light/dark.
+        GlassOn = s.GlassEffect switch { "off" => false, "frosted" or "liquid" => true, _ => Current.Backdrop != BackdropKind.None };
         Liquid = s.GlassEffect == "liquid";
         _variants[0] = _variants[1] = null;
         Fill(Application.Current.Resources, Current, s);
@@ -176,7 +186,7 @@ public static class ThemeManager
         r["Bar.Sheen"] = sheen;
         r["Bar.Rim"] = Liquid ? Rim(0x3A, 0x0C, 0x1C) : Brushes.Transparent;
         // Inner shading (the reference bar: a faint light from the top edge, a soft shadow rising from the bottom).
-        r["Bar.Shade"] = Shade(p.IsLight);
+        r["Bar.Shade"] = GlassOn ? Shade(p.IsLight) : Brushes.Transparent; // solid styles (Black, White) are flat, like the reference
 
         var tile = TileOverride(s.WidgetStyle) ?? (p.Tile, p.TileHover, p.TileBorder);
         if (s.GlassTiles && GlassOn)
@@ -193,8 +203,10 @@ public static class ThemeManager
         B("Fill.Track", p.Track);
         B("Fill.Control", p.Control);
         B("Fill.ControlHover", p.ControlHover);
-        // Live blur on: panels become frosted glass (macOS popover / reference cards); off: opaque.
-        B("Flyout.Background", s.LiveBlur ? Color.FromArgb(p.IsLight ? (byte)0xD6 : (byte)0xC4, p.Flyout.R, p.Flyout.G, p.Flyout.B) : p.Flyout);
+        // Cards are solid, like the reference (#181818 on the dark styles). The picker and control panel are frosted
+        // glass over a live blur while LiveBlur is on (Panel.Background), opaque otherwise.
+        B("Flyout.Background", p.Flyout);
+        B("Panel.Background", s.LiveBlur ? Color.FromArgb(p.IsLight ? (byte)0xD6 : (byte)0xC4, p.Flyout.R, p.Flyout.G, p.Flyout.B) : p.Flyout);
         B("Flyout.Border", p.FlyoutBorder);
         B("Divider", p.Divider);
         B("Sys.Red", p.Red);

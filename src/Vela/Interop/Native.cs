@@ -39,6 +39,10 @@ internal static class Native
     public const int WM_MOUSEACTIVATE = 0x0021;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_DPICHANGED = 0x02E0;
+    public const int WM_HOTKEY = 0x0312;
+    public const uint MOD_ALT = 0x0001, MOD_NOREPEAT = 0x4000;
+    [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+    [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     public const int MA_NOACTIVATE = 3;
     public const int SPI_SETWORKAREA = 0x002F;
 
@@ -195,6 +199,7 @@ internal static class Native
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder sb, int max);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder sb, int max);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [DllImport("user32.dll")] public static extern bool IsHungAppWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int cmd);

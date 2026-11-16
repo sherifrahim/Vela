@@ -376,6 +376,69 @@ public sealed class ActionWidget : WidgetBase
     }
 }
 
+/// <summary>
+/// Terminal launcher (owner's addition, not in the reference): click for a card with PowerShell / Command Prompt, normal or
+/// as administrator. Middle-click = PowerShell straight away. Alt+T (Settings → Dock) = PowerShell as administrator.
+/// </summary>
+public sealed class TerminalWidget : WidgetBase
+{
+    protected override UIElement BuildContent()
+    {
+        Tile.Width = TileHeight;
+        Tile.Padding = new Thickness(0);
+        ToolTip = "Terminal";
+        return Icon(Glyphs.Terminal, 15);
+    }
+
+    protected override void OnMiddleClick() => WinActions.LaunchShell(WinActions.ShellKind.PowerShell, admin: false);
+
+    protected override void AddMenuItems(ContextMenu menu)
+    {
+        foreach (var (name, kind, admin) in Choices)
+            menu.Items.Add(Item(name + (admin ? " (admin)" : ""), () => WinActions.LaunchShell(kind, admin)));
+    }
+
+    static readonly (string Name, WinActions.ShellKind Kind, bool Admin)[] Choices =
+    {
+        ("PowerShell", WinActions.ShellKind.PowerShell, false),
+        ("PowerShell", WinActions.ShellKind.PowerShell, true),
+        ("Command Prompt", WinActions.ShellKind.Cmd, false),
+        ("Command Prompt", WinActions.ShellKind.Cmd, true),
+    };
+
+    // Brand-style badges (allowed exception to theme colours): PowerShell navy, Command Prompt black.
+    static readonly Brush PsBadge = Frozen(Color.FromRgb(0x01, 0x24, 0x56)), CmdBadge = Frozen(Color.FromRgb(0x1E, 0x1E, 0x1E));
+    static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+
+    protected override UIElement BuildCard()
+    {
+        var rows = new StackPanel();
+        foreach (var (name, kind, admin) in Choices)
+        {
+            var badge = new Border
+            {
+                Width = 34, Height = 34, CornerRadius = new CornerRadius(9),
+                Background = kind == WinActions.ShellKind.Cmd ? CmdBadge : PsBadge,
+                Child = Text(kind == WinActions.ShellKind.Cmd ? "C:\\" : ">_", 12, FontWeights.Bold, "OnAccent").Center(),
+            };
+            var sub = admin ? "As administrator · Windows asks to confirm"
+                : kind == WinActions.ShellKind.PowerShell ? (WinActions.HasPwsh ? "PowerShell 7" : "Windows PowerShell") : "cmd.exe";
+            var label = V(Text(name, 13.5, FontWeights.SemiBold), Text(sub, 11.5, null, "Text.Secondary"));
+            label.Margin = new Thickness(12, 0, 0, 0);
+            var right = admin ? Icon(Glyphs.Shield, 13, "Sys.Orange") : new TextBlock();
+            var row = Columns("auto,*,auto", badge, label, right);
+            var (k, a) = (kind, admin);
+            var b = GhostButton(row, () => { WinActions.LaunchShell(k, a); FlyoutWindow.CloseCurrent(); });
+            b.Padding = new Thickness(6);
+            b.Margin = new Thickness(-6, 0, -6, 4);
+            rows.Children.Add(b);
+        }
+        var hint = Text(Settings.Current.AdminShellHotkey ? "Alt+T opens PowerShell as administrator from anywhere." : "Middle-click the tile for PowerShell.", 11.5, null, "Text.Tertiary");
+        hint.Margin = new Thickness(0, 8, 0, 0);
+        return V(Card.Header("Terminal"), rows, hint);
+    }
+}
+
 /// <summary>Free space on the system drive; card lists every drive.</summary>
 public sealed class StorageWidget : WidgetBase
 {

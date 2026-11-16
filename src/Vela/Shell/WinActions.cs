@@ -30,6 +30,49 @@ public static class WinActions
     public static void OpenNotificationCenter() => SendKeys(VK_LWIN, 0x4E /*N*/);
     public static void OpenQuickSettings() => SendKeys(VK_LWIN, 0x41 /*A*/);
     public static void OpenTaskManager() => WindowTracker.Launch("taskmgr.exe");
+
+    public enum ShellKind { PowerShell, Cmd }
+
+    static string? _pwsh;
+    /// <summary>PowerShell 7 (pwsh.exe) when installed, else Windows PowerShell.</summary>
+    public static string PowerShellPath => _pwsh ??= FindPwsh() ?? "powershell.exe";
+    public static bool HasPwsh => PowerShellPath != "powershell.exe";
+
+    static string? FindPwsh()
+    {
+        try
+        {
+            var dirs = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Append(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell", "7"));
+            foreach (var d in dirs)
+            {
+                var p = Path.Combine(d.Trim(), "pwsh.exe");
+                if (File.Exists(p)) return p;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Open a console: PowerShell or Command Prompt, optionally elevated ("runas": Windows shows its UAC prompt; cancelling
+    /// it is not an error). Started off the UI thread: ShellExecute blocks while the consent prompt is up.
+    /// </summary>
+    public static void LaunchShell(ShellKind kind, bool admin)
+    {
+        var exe = kind == ShellKind.Cmd ? "cmd.exe" : PowerShellPath;
+        Task.Run(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Paths.UserHome };
+                if (admin) psi.Verb = "runas";
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) { } // UAC prompt cancelled
+            catch (Exception ex) { Log.Warn($"Could not open {exe}: {ex.Message}"); }
+        });
+    }
     public static void OpenSettings(string page) => WindowTracker.OpenUri("ms-settings:" + page);
 
     // ---------- light / dark ----------

@@ -25,13 +25,13 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [~] Desktop corner: hover = peek (undocumented DWM call), click = show desktop (peek not verified)
 - [~] Top edge + drag-to-snap (code done, not yet tested by hand)
 - [x] Fullscreen hide/restore per display — verified (Unreal Engine fullscreen on display 1 hid only that dock)
-- [ ] Tooltips should open *below* when the dock is on top (ToolTip style uses Placement=Top)
+- [x] Tooltips open below a top dock (`ToolTip.Placement` / `ToolTip.Offset` resources, `ThemeManager.ApplyEdge`)
 - [~] Auto-hide: off / smart (window overlaps) / always, edge trigger (code done; not hand-tested — owner was in a fullscreen app)
 - [~] Adaptive theme: each display's dock matches its screen (colours + light/dark) — verified dark on display 2
 - [~] Live drag-and-drop: dragged item follows the pointer, neighbours glide (code done, not hand-tested)
-- [ ] Magnified icons may grow above the bar (needs a taller transparent window band + clip changes)
+- [x] Magnified icons grow above the bar (`DockWindow.Headroom`, 18 DIP transparent band)
 - [ ] Per-display app filtering ("show only windows on this display") for secondary docks
-- [ ] Lock dock setting
+- [x] Lock dock setting (`LockDock`: no widget/app/edge drags unless the picker is open)
 
 ## P1 — apps (taskbar parity)
 - [x] Start button (click = Start, right-click = quick menu shortcuts), pinned apps imported from taskbar
@@ -39,7 +39,7 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [x] Context menu: window list, new window, pin/unpin, close
 - [x] Live window previews on hover (DWM thumbnails, click to switch, ✕ to close) — verified
 - [x] Jump lists (pinned / recent / frequent / tasks) in app menus — verified (Brave)
-- [ ] End task for hung windows (IsHungAppWindow)
+- [x] End task for hung windows (`IsHungAppWindow`; menu item only when not responding)
 - [ ] App badges (unread counts) — needs notification access; investigate `UserNotificationListener` with a sparse package identity
 - [ ] Drag files/folders onto the dock to pin; drag files over an app to bring it forward
 - [ ] App groups / folder stacks; Trash on the dock
@@ -57,16 +57,16 @@ Todo, roughly by value:
 - [x] Control Centre (Windows quick settings: radios, airplane, dark mode, mic, battery saver, power mode, brightness, volume)
 - [x] System Monitor (CPU / GPU / RAM / network + card with top processes)
 - [ ] Calendar next event — Windows `Appointments` API needs package identity; Google Calendar via OAuth later
-- [ ] Volume card: per-app mixer (IAudioSessionManager2) + output device switch (IPolicyConfig)
+- [x] Volume card: per-app mixer (IAudioSessionManager2) + output device switch (IPolicyConfig) — `Services/AudioMixer.cs`, read on demand
 - [ ] Connect/disconnect paired Bluetooth audio (no public API; investigate KS reconnect like ToothTray)
 - [ ] Do Not Disturb toggle (Focus Assist: `WNF`/quiet hours APIs — research), Keyboard (osk.exe), Language (keyboard layout switch)
-- [ ] Top CPU / Top RAM tiles (per-process CPU% needs two samples; reuse SystemMonitor ticks)
+- [x] Top CPU / Top RAM tiles (shared sampler)
 - [ ] Temperature (WMI MSAcpi_ThermalZoneTemperature needs admin → research LibreHardwareMonitor-style alternatives)
 - [x] Flip clock, analog minimal, world clocks, weather status, hourly, today & forecast, Top CPU / Top RAM
 - [ ] Segment clock, clock & weather, 7 days, battery core / gauge, temperature, day timeline, stock watchlist
-- [ ] Now Playing compact + bar variants; per-app volume mixer card (IAudioSessionManager2)
+- [ ] Now Playing compact + bar variants (per-app mixer done: Speakers tile → "Output and apps")
 - [ ] Quick toggles: hotspot, airplane, energy saver, Ethernet status, user-selectable toggles
-- [ ] Weather details / hourly / today & forecast / status tiles (service already has the data)
+- [x] Weather hourly / today & forecast / status / sunrise tiles
 - [ ] Brightness for external monitors (DDC/CI via dxva2 `SetMonitorBrightness`)
 - [ ] Search / Commands launcher, Recently opened, Screenshot capture
 - [ ] AI: Gemini (Antigravity), Grok, DeepSeek balance (key), GLM (key), OpenCode (local), Cursor
@@ -93,7 +93,7 @@ Todo, roughly by value:
 ## P2 — notifications & automations
 - [ ] Notification listener (badges, WhatsApp tile) — requires package identity (sparse MSIX) → research
 - [ ] Automations: AI limit warning toast, timer/pomodoro end toast (currently a system sound), quiet hours
-- [ ] Global hotkeys: Alt+T todos, Win+T apps
+- [~] Global hotkeys: Alt+T = PowerShell as admin (owner chose this over the reference's Alt+T todos; `AdminShellHotkey`, main dock owns it). Win+T apps still open (Explorer owns Win+T)
 
 ## Engineering
 - [x] Unit tests (xUnit, `tests/Vela.Tests`, 14 tests) + `tools/smoke.ps1` — by Codex, session 5

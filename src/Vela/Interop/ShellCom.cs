@@ -153,3 +153,81 @@ internal static class ShellNative
         finally { if (link != null) Marshal.ReleaseComObject(link); }
     }
 }
+
+// ---------- Core Audio: device list, per-app sessions, default device (used by Services/AudioMixer) ----------
+[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IMMDeviceCollection
+{
+    [PreserveSig] int GetCount(out uint count);
+    [PreserveSig] int Item(uint index, out IMMDevice device);
+}
+
+[ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioSessionManager2
+{
+    // IAudioSessionManager
+    [PreserveSig] int GetAudioSessionControl(IntPtr sessionGuid, uint flags, out IntPtr control);
+    [PreserveSig] int GetSimpleAudioVolume(IntPtr sessionGuid, uint flags, out IntPtr volume);
+    // IAudioSessionManager2
+    [PreserveSig] int GetSessionEnumerator(out IAudioSessionEnumerator sessions);
+}
+
+[ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioSessionEnumerator
+{
+    [PreserveSig] int GetCount(out int count);
+    [PreserveSig] int GetSession(int index, out IAudioSessionControl2 session);
+}
+
+[ComImport, Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioSessionControl2
+{
+    // IAudioSessionControl
+    [PreserveSig] int GetState(out int state);
+    [PreserveSig] int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+    [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string name, ref Guid ctx);
+    [PreserveSig] int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string path);
+    [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string path, ref Guid ctx);
+    [PreserveSig] int GetGroupingParam(out Guid group);
+    [PreserveSig] int SetGroupingParam(ref Guid group, ref Guid ctx);
+    [PreserveSig] int RegisterAudioSessionNotification(IntPtr client);
+    [PreserveSig] int UnregisterAudioSessionNotification(IntPtr client);
+    // IAudioSessionControl2
+    [PreserveSig] int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);
+    [PreserveSig] int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string id);
+    [PreserveSig] int GetProcessId(out uint pid);
+    [PreserveSig] int IsSystemSoundsSession();
+}
+
+[ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface ISimpleAudioVolume
+{
+    [PreserveSig] int SetMasterVolume(float level, ref Guid ctx);
+    [PreserveSig] int GetMasterVolume(out float level);
+    [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid ctx);
+    [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+}
+
+/// <summary>
+/// Undocumented but stable since Windows 7 (used by the Sound control panel and tools like EarTrumpet/SoundSwitch):
+/// the only way to change the default playback device. Only <see cref="SetDefaultEndpoint"/> is called; the other
+/// slots are placeholders that keep the vtable layout.
+/// </summary>
+[ComImport, Guid("f8679f50-850a-41cf-9c72-430f290290c8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IPolicyConfig
+{
+    [PreserveSig] int GetMixFormat();
+    [PreserveSig] int GetDeviceFormat();
+    [PreserveSig] int ResetDeviceFormat();
+    [PreserveSig] int SetDeviceFormat();
+    [PreserveSig] int GetProcessingPeriod();
+    [PreserveSig] int SetProcessingPeriod();
+    [PreserveSig] int GetShareMode();
+    [PreserveSig] int SetShareMode();
+    [PreserveSig] int GetPropertyValue();
+    [PreserveSig] int SetPropertyValue();
+    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
+}
+
+[ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")]
+internal class PolicyConfigClient { }

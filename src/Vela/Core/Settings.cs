@@ -26,7 +26,9 @@ public sealed class AppSettings
     public bool ShowAppNames { get; set; } = true;
     public bool DesktopCorner { get; set; } = true;   // peek / show-desktop sliver at the far end
     public string Displays { get; set; } = "all";     // all (a dock on every display) | primary
-    public bool Magnification { get; set; } = true;   // macOS-style icon magnification on hover
+    public bool Magnification { get; set; }            // macOS-style icon magnification on hover (off in the reference)
+    public bool LockDock { get; set; }                 // widgets, apps and the bar edge move only while the widget picker is open
+    public bool AdminShellHotkey { get; set; } = true; // Alt+T opens PowerShell as administrator from anywhere
     public bool AppTiles { get; set; } = false;       // each app icon in its own tile; false (default) = loose icons on the glass, like the reference and macOS
     public bool Island { get; set; } = true;          // Vela Island: Dynamic-Island-style activity pill at the top of the main display
     public double MagnifyAmount { get; set; } = 1.45; // largest icon scale (1.1–1.6)
@@ -110,7 +112,7 @@ public static class Settings
     /// <summary>Default dock, modelled on the reference screenshot layout.</summary>
     public static List<WidgetInstance> DefaultLayout() => new[]
     {
-        "battery", "nowplaying.mini", "volume", "quicktoggles", "apps", "screentime", "claude", "controlcenter", "clock",
+        "battery", "nowplaying.mini", "volume", "quicktoggles", "battery.dots", "apps", "screentime", "claude", "clock",
     }.Select(t => new WidgetInstance { Type = t }).ToList();
 
     public static void Save(string what = "")

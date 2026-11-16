@@ -4,6 +4,51 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-17 — Claude (Opus 5.5) — session 6: closer to the reference (colours, cards, Start, defaults)
+
+Owner: "are we like lumabar now? … change the behaviour and themes and colours to match; you can overwrite my settings."
+Compared renders against `reference/lumabar/assets/*` with sampled pixel colours.
+
+**Changed (uncommitted)**
+- Cards are solid like the reference: `Flyout.Background` = #181818 on Black / Liquid Glass (no live blur under cards);
+  the picker and control panel stay frosted via the new `Panel.Background` key. `Card.Header`: 15.5 semibold title,
+  plain ✕, hairline rule edge to edge under the header.
+- White style is a solid white bar (#FFF, tiles #F3F3F3); bar shading only on glass styles. `GlassOn` no longer forced
+  on by `AdaptiveTheme` (glass follows the chosen style; "Match the screen" only flips light/dark).
+- Start = light Windows mark on a dark rounded tile (`WindowsLogo.StartTile`); the focused app gets a thin accent
+  outline around its icon (`AppItem._ring`, scales with magnification).
+- Defaults: `Magnification` off; default layout = battery, nowplaying.mini, volume, quicktoggles, battery.dots, apps,
+  screentime, claude, clock (the reference order). The owner's settings were reset to these
+  (backup: `%LOCALAPPDATA%\Vela\settings.before-reference-reset.json`; pinned apps and weather kept).
+- Tabular figures only for number-like text (`UI.NumberLike`): Inter's tabular set widened hyphens ("sign - in").
+- `--render` also writes `cards.png` (Claude, ChatGPT, calendar cards).
+
+**Verified:** build 0/0, tests 14/14, renders (glass/white/midnight + cards), live dock on both displays, no new log
+warnings.
+
+**Later the same session (owner: "keep working"):**
+- Lock dock (`LockDock`): widgets, apps and the bar edge only move while the picker is open.
+- End task for hung apps: app menu shows "End task (not responding)" when `IsHungAppWindow` (kills the owning process).
+- Tooltips open below a top dock (`ToolTip.Placement`/`ToolTip.Offset` resources set by `ThemeManager.ApplyEdge`).
+- Alt+T = PowerShell **as administrator** (owner asked for this instead of todos): `AdminShellHotkey`, RegisterHotKey on
+  the main dock (`DockWindow.SyncHotkeys`), `WinActions.LaunchShell` (pwsh 7 if installed, runas off the UI thread;
+  UAC cancel ignored). Registration verified (another process can't claim Alt+T); the key itself not pressed (owner gaming).
+- New `terminal` widget (System): card with PowerShell / Command Prompt, normal or admin; middle-click = PowerShell.
+  Added to the owner's dock after the apps.
+- Sound card (click the device name on the Speakers tile, or right-click → "Output and apps…"): output devices (click =
+  default for every role via the undocumented-but-stable `IPolicyConfig`), master slider, one slider per app from
+  Core Audio sessions (grouped by exe; click the icon to mute). `Services/AudioMixer.cs` reads on demand only; session COM
+  refs are released when the card unloads. Rendered with real data (2 devices, 2 apps); device switching NOT exercised
+  live (would have moved the owner's game audio).
+
+**Next up**
+1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category
+   icons). Not renderable off-screen yet (needs a DockWindow) — add a `--render` path if you touch it.
+2. Claude tile shows "sample" plan rows here: the desktop app's Code tab writes no `~/.claude/.credentials.json`.
+3. Quick Toggles: Bluetooth pill neutral when on but no device connected? (reference shows it grey) — confirm.
+
+---
+
 ## 2026-11-16 — Claude (Opus 5.5) + Codex — session 5: live blur everywhere, first joint pass with Codex
 
 **Released** v0.4.0 (premium pass) at the start of this session.

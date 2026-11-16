@@ -158,6 +158,18 @@ public sealed class WindowTracker
 
     public static void Close(IntPtr h) => PostMessage(h, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
 
+    /// <summary>Windows marks a window "not responding" after ~5 s without pumping messages.</summary>
+    public static bool IsHung(IntPtr h) { try { return Interop.Native.IsHungAppWindow(h); } catch { return false; } }
+
+    /// <summary>End task: terminate the process that owns the window (only offered for hung apps, on the user's click).</summary>
+    public static void EndTask(IntPtr h)
+    {
+        GetWindowThreadProcessId(h, out uint pid);
+        if (pid == 0 || pid == (uint)Environment.ProcessId) return;
+        try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); p.Kill(); Log.Info("End task: " + p.ProcessName); }
+        catch (Exception ex) { Log.Warn("End task failed: " + ex.Message); }
+    }
+
     public static void Launch(string path, string? args = null)
     {
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, Arguments = args ?? "" }); }

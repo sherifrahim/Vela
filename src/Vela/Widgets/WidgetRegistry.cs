@@ -55,6 +55,7 @@ public static class WidgetRegistry
         new("notifications", "Notifications", "System", () => new ActionWidget(ActionWidget.Kind.Notifications)),
         new("showdesktop", "Show Desktop", "System", () => new ActionWidget(ActionWidget.Kind.ShowDesktop)),
         new("taskmanager", "Task Manager", "System", () => new ActionWidget(ActionWidget.Kind.TaskManager)),
+        new("terminal", "Terminal", "System", () => new TerminalWidget()),
         new("controlcenter", "Control Centre", "System", () => new ControlCenterWidget()),
 
         // Apps & Files
