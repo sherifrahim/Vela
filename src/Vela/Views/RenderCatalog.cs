@@ -17,7 +17,11 @@ namespace Vela.Views;
 /// </summary>
 public static class RenderCatalog
 {
-    public static void Run(string dir, string? theme)
+    /// <summary>Widgets that show personal data (location, process names, recent files): left out of --public renders.</summary>
+    static readonly HashSet<string> Personal = new() { "weather", "weather.status", "weather.sun", "topcpu", "topram", "recent", "downloads", "sysmon" };
+
+    /// <param name="publicSafe">For screenshots that get published: skip <see cref="Personal"/> widgets and the cards.</param>
+    public static void Run(string dir, string? theme, bool publicSafe = false)
     {
         Directory.CreateDirectory(dir);
         Settings.Load();
@@ -25,13 +29,13 @@ public static class RenderCatalog
         ThemeManager.Apply();
 
         // 1) The current dock layout on a dark "wallpaper".
-        var dockItems = Settings.Current.Widgets.Select(i => WidgetRegistry.Create(i, preview: true)).Where(w => w != null).Cast<WidgetBase>().ToList();
+        var dockItems = Settings.Current.Widgets.Where(i => !(publicSafe && Personal.Contains(i.Type))).Select(i => WidgetRegistry.Create(i, preview: true)).Where(w => w != null).Cast<WidgetBase>().ToList();
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var w in dockItems) { w.Margin = new Thickness(3, 0, 3, 0); row.Children.Add(w); }
         var dock = Bar(row);
 
         // 2) Every widget, labelled, in a grid of bars.
-        var all = WidgetRegistry.All.Where(d => !d.Hidden && d.Type is not "apps").ToList();
+        var all = WidgetRegistry.All.Where(d => !d.Hidden && d.Type is not "apps" && !(publicSafe && Personal.Contains(d.Type))).ToList();
         var grid = new WrapPanel { Width = 1700 };
         var catalog = new List<WidgetBase>();
         foreach (var d in all)
@@ -49,9 +53,10 @@ public static class RenderCatalog
 
         Save(Backdrop(dock), Path.Combine(dir, "dock.png"));
         Save(Backdrop(grid), Path.Combine(dir, "catalog.png"));
+        if (publicSafe) { Log.Info($"Rendered (public) dock + {catalog.Count} widgets to {dir}"); return; }
         // 3) A few cards (solid, as they open over the dock).
         var cards = new WrapPanel { Width = 1500 };
-        foreach (var type in new[] { "claude", "codex", "terminal", "volume", "linear", "revenue.total" })
+        foreach (var type in new[] { "commands", "recent", "terminal", "volume", "linear", "revenue.total" })
         {
             var w = catalog.FirstOrDefault(c => c.Instance?.Type == type);
             if (w?.CardForRender() is not { } content) continue;

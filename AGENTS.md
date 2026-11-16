@@ -39,7 +39,7 @@ Vela.exe --quit            # close a running dock cleanly (restores the taskbar)
 Vela.exe --widgets         # open the widget picker in the running dock
 Vela.exe --settings        # open Settings in the running dock
 Vela.exe --restore-taskbar # emergency: put the Windows taskbar back
-Vela.exe --render <dir> [--theme glass|black|white|frost|midnight]  # dock + every widget + island to PNGs, off-screen
+Vela.exe --render <dir> [--theme glass|black|white|frost|midnight] [--public]  # dock + widgets (+ cards, island) to PNGs, off-screen; --public skips personal data, use it for docs/screenshots
 powershell -File tools/publish.ps1                      # self-contained Release build → ./publish/win-x64
 ```
 

@@ -32,6 +32,7 @@ public static class WidgetRegistry
         new("clock.week", "7 Days", "Clocks", () => new SevenDaysWidget()),
         new("clock.segment", "Segment Clock", "Clocks", () => new SegmentClockWidget()),
         new("clock.weather", "Clock & Weather", "Clocks", () => new ClockWeatherWidget()),
+        new("clock.worldtime", "World Time", "Clocks", () => new WorldTimeWidget()),
         new("clock.world", "World Clocks", "Clocks", () => new WorldClocksWidget()),
 
         // Productivity
@@ -39,6 +40,7 @@ public static class WidgetRegistry
         new("pomodoro", "Pomodoro", "Productivity", () => new PomodoroWidget()),
         new("timer", "Timer", "Productivity", () => new TimerWidget()),
         new("stopwatch", "Stopwatch", "Productivity", () => new StopwatchWidget()),
+        new("daytimeline", "Day Timeline", "Productivity", () => new DayTimelineWidget()),
         new("todos", "Todos", "Productivity", () => new TodosWidget()),
         new("notes", "Notes", "Productivity", () => new NotesWidget()),
         new("currency", "Currency", "Productivity", () => new CurrencyWidget()),
@@ -71,11 +73,17 @@ public static class WidgetRegistry
         new("apps", "Apps", "Apps & Files", () => new AppsWidget()),
         new("storage", "Storage", "Apps & Files", () => new StorageWidget()),
         new("recyclebin", "Recycle Bin", "Apps & Files", () => new RecycleBinWidget()),
+        new("recent", "Recently Opened", "Apps & Files", () => new RecentFilesWidget()),
+        new("search", "Search", "Apps & Files", () => new SearchWidget()),
+        new("commands", "Commands", "Apps & Files", () => new CommandsWidget()),
+        new("screenshot", "Screenshot Capture", "Apps & Files", () => new ScreenshotWidget()),
         new("downloads", "Downloads Stack", "Apps & Files", () => new DownloadsWidget()),
 
         // Media & Audio
         new("nowplaying", "Now Playing", "Media & Audio", () => new NowPlayingWidget()),
+        new("nowplaying.compact", "Now Playing (compact)", "Media & Audio", () => new NowPlayingCompactWidget()),
         new("nowplaying.mini", "Now Playing Mini", "Media & Audio", () => new NowPlayingMiniWidget()),
+        new("nowplaying.bar", "Now Playing Bar", "Media & Audio", () => new NowPlayingBarWidget()),
         new("nowplaying.art", "Album Art", "Media & Audio", () => new AlbumArtWidget()),
         new("volume", "Audio Output", "Media & Audio", () => new VolumeWidget()),
         new("microphone", "Microphone", "Media & Audio", () => new MicrophoneWidget()),
@@ -89,6 +97,7 @@ public static class WidgetRegistry
 
         // Finance / Stocks
         new("stripe", "Stripe", "Finance", () => new StripeWidget(), "stripe"),
+        new("stripe.chart", "Stripe Chart", "Finance", () => new StripeWidget(chart: true), "stripe"),
         new("revenue.total", "Total Revenue", "Finance", () => new TotalRevenueWidget()),
         new("polar", "Polar", "Finance", () => new MetricWidget("polar"), "polar"),
         new("polar.chart", "Polar Chart", "Finance", () => new MetricWidget("polar", chart: true), "polar"),
@@ -121,6 +130,7 @@ public static class WidgetRegistry
         // Online
         new("github", "GitHub", "Online & Mail", () => new GitHubWidget(), "github"),
         new("github.activity", "GitHub Activity", "Online & Mail", () => new MetricWidget("githubactivity", chart: true), "github"),
+        new("github.overview", "GitHub Overview", "Online & Mail", () => new MetricWidget("githuboverview"), "github"),
         new("leetcode", "LeetCode Stats", "Online & Mail", () => new MetricWidget("leetcode"), "leetcode"),
         new("youtube", "YouTube", "Social", () => new MetricWidget("youtube"), "youtube"),
 

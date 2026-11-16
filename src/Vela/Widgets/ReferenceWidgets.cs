@@ -221,7 +221,7 @@ public sealed class AnalogClockWidget : WidgetBase
 /// <summary>Three small dials with city codes (reference "World Clocks"). Right-click to change cities.</summary>
 public sealed class WorldClocksWidget : WidgetBase
 {
-    static readonly (string Code, string Zone)[] Choices =
+    internal static readonly (string Code, string Zone)[] Choices =
     {
         ("NYC", "Eastern Standard Time"), ("SF", "Pacific Standard Time"), ("LON", "GMT Standard Time"), ("PAR", "Romance Standard Time"),
         ("DXB", "Arabian Standard Time"), ("IND", "India Standard Time"), ("SGP", "Singapore Standard Time"), ("TYO", "Tokyo Standard Time"), ("SYD", "AUS Eastern Standard Time"),

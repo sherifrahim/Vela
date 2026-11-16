@@ -40,7 +40,7 @@ public static class Services
     {
         new PolarConnector(), new LemonSqueezyConnector(), new PaddleConnector(), new GumroadConnector(), new ShopifyConnector(), new DodoConnector(),
         new DeepSeekConnector(), new PlausibleConnector(), new DubConnector(), new LinearConnector(), new SupabaseConnector(), new ResendConnector(),
-        new YouTubeConnector(), new LeetCodeConnector(), new GitHubActivityConnector(), new FinnhubConnector(),
+        new YouTubeConnector(), new LeetCodeConnector(), new GitHubActivityConnector(), new GitHubOverviewConnector(), new FinnhubConnector(),
     });
 
     public static SystemMonitor Sys => _sys.Value;
@@ -69,7 +69,7 @@ public static class Services
     public static MetricConnector Account(string id) => Accounts.First(a => a.Id == id);
 
     // GitHub Activity shares the GitHub token, so it has no row of its own on the Connections page.
-    public static IEnumerable<IConnector> AllConnectors => new IConnector[] { Claude, Codex, GitHub, Stripe }.Concat(Accounts.Where(a => a.Id != "githubactivity"));
+    public static IEnumerable<IConnector> AllConnectors => new IConnector[] { Claude, Codex, GitHub, Stripe }.Concat(Accounts.Where(a => a.Id is not ("githubactivity" or "githuboverview")));
 
     public static void FlushAll()
     {

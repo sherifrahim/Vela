@@ -6,21 +6,21 @@ Checked 2026-11-17 against lumabar.xyz (home, /widgets, /docs, /changelog, /term
 no trial. Every widget and feature comes with the one license; there is no free/paid split. So "everything it
 charges for" = the whole app below.
 
-## Widgets: 81 of 109
+## Widgets: 91 of 109
 
 | Category (theirs) | Have | Missing |
 |---|---|---|
-| Clocks (11) | 10 | World Time |
-| Productivity (10) | 8 | Day Timeline, WhatsApp (needs notification access) · Calendar has no Google/Outlook/iCloud events yet |
+| Clocks (11) | 11 | — |
+| Productivity (10) | 9 | WhatsApp (needs notification access) · Calendar has no Google/Outlook/iCloud events yet |
 | System (23) | 20 | Tray, Temperature, Do Not Disturb |
-| Media & Audio (6) | 4 | Now Playing compact, Now Playing Bar |
+| Media & Audio (6) | 6 | — |
 | AI (11) | 5 | Gemini (Antigravity sign-in), Grok, GLM, OpenCode, OpenCode Plan, Cursor |
-| Finance (15) | 14 | Stripe Chart |
+| Finance (15) | 15 | — |
 | Analytics (4) | 2 | Search Console (Google OAuth), DataFast |
 | Developer (3) | 3 | — |
-| Online & Mail (6) | 3 | Gmail (own Google OAuth client), GitHub Overview, Wallpaper Gallery (Unsplash) |
+| Online & Mail (6) | 4 | Gmail (own Google OAuth client), Wallpaper Gallery (Unsplash) |
 | Social (4) | 1 | X, TikTok, Instagram (their APIs need paid / reviewed developer apps) |
-| Apps & Files (7) | 3 | Recently Opened, Search, Commands, Screenshot Capture |
+| Apps & Files (7) | 7 | — |
 | Weather (6) | 6 | — |
 | Stocks (3) | 2 | Stock Chart (Finnhub candles are a paid endpoint; needs another source) |
 

@@ -624,3 +624,45 @@ public sealed class FinnhubConnector : MetricConnector
         Sub = rows.Count > 0 ? rows[0].Value.Split("  ").Last() + " today" : "add symbols";
     }
 }
+
+/// <summary>GitHub at a glance: stars across your repositories, followers, repos, open issues. Shares the GitHub token.</summary>
+public sealed class GitHubOverviewConnector : MetricConnector
+{
+    public override string Id => "githuboverview";
+    public override string Name => "GitHub Overview";
+    public override string Description => "Stars, followers, repositories and open issues. Uses the GitHub token (classic, read:user; add repo for private repos).";
+    public override string? SecretName => "github.token";
+    public override string KeyHint => "ghp_…";
+    public override string? HelpUrl => "https://github.com/settings/tokens/new?scopes=notifications,read:user&description=Vela";
+    public override string BadgeColor => "#24292F";
+    public override string BadgeText => "GH";
+    public override string Unit => "stars";
+    public override string SampleValue => "★ 482";
+    protected override TimeSpan Interval => TimeSpan.FromMinutes(30);
+    string? _login;
+    public override string? OpenUrl => _login != null ? $"https://github.com/{_login}" : "https://github.com";
+
+    protected override async Task FetchMetricAsync(string key)
+    {
+        void Auth(HttpRequestMessage r)
+        {
+            r.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            r.Headers.Accept.ParseAdd("application/vnd.github+json");
+        }
+        using var me = await Http.GetJsonAsync("https://api.github.com/user", Auth);
+        _login = Str(me.RootElement, "login");
+        using var repos = await Http.GetJsonAsync("https://api.github.com/user/repos?per_page=100&affiliation=owner&sort=updated", Auth);
+        var list = repos.RootElement.EnumerateArray().ToList();
+        double stars = list.Sum(r => Num(r, "stargazers_count")), issues = list.Sum(r => Num(r, "open_issues_count"));
+        Value = "★ " + Count(stars);
+        Sub = $"stars · {_login}";
+        Rows = new()
+        {
+            new("Followers", Count(Num(me.RootElement, "followers"))),
+            new("Repositories", Count(list.Count)),
+            new("Open issues & PRs", Count(issues)),
+        };
+        Rows.AddRange(list.OrderByDescending(r => Num(r, "stargazers_count")).Take(3)
+            .Select(r => new MetricRow(Str(r, "name") ?? "repo", "★ " + Count(Num(r, "stargazers_count")), Str(r, "html_url"))));
+    }
+}

@@ -48,6 +48,11 @@ warnings.
   store + token, key + symbols) go in one field separated by a space. Endpoints checked (401/403 without a key),
   LeetCode checked end to end; **no connector has been tried with a real key**.
 - `docs/PARITY.md`: 81 of the reference's 109 widgets; what is missing and why.
+- Then 10 more (`Widgets/ExtraWidgets.cs` + GitHub Overview connector + Stripe Chart): World Time, Day Timeline,
+  Recently Opened (skips ms-* protocol entries), Search (Win+S), Commands (run box + quick actions), Screenshot
+  (ms-screenclip:), Now Playing compact / bar, Stripe Chart, GitHub Overview. Now 91 of 109.
+- `--render … --public` leaves out widgets with personal data (location, process names, recent files) and the cards;
+  `docs/screenshots` (dock, dock-white, dock-midnight, widgets) were regenerated with it. README updated (98 widgets).
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

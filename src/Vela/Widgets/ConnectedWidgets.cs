@@ -221,6 +221,12 @@ public sealed class AiLimitsWidget : WidgetBase
 public sealed class StripeWidget : WidgetBase
 {
     TextBlock _value = null!, _sub = null!;
+    readonly bool _chart;
+    Sparkline? _spark;
+
+    public StripeWidget() : this(false) { }
+    /// <param name="chart">"Stripe Chart" (reference): the tile also shows the last 14 days as bars.</param>
+    public StripeWidget(bool chart) => _chart = chart;
 
     protected override UIElement BuildContent()
     {
@@ -233,7 +239,9 @@ public sealed class StripeWidget : WidgetBase
         badge.VerticalAlignment = VerticalAlignment.Top;
         badge.Margin = new Thickness(0, 5, 0, 0);
         g.Children.Add(badge);
-        return g;
+        if (!_chart) return g;
+        _spark = new Sparkline("Accent") { Width = 58, Height = 24, Bars = true, Margin = new Thickness(6, 0, 2, 0) };
+        return H(g, _spark);
     }
 
     protected override void OnAttach() { Svc.Stripe.Changed += Render; Render(); }
@@ -245,6 +253,7 @@ public sealed class StripeWidget : WidgetBase
         _value.Text = s.IsConnected ? (s.LastUpdated != null ? s.Display : "…") : "$5,336";
         _value.Opacity = s.IsConnected ? 1 : 0.5;
         _sub.Text = !s.IsConnected ? "sample · click to connect" : s.Error ?? (s.TestMode ? "test mode · 30 days" : "net revenue · 30 days");
+        if (_spark != null) { _spark.SetValues(s.IsConnected && s.Daily.Count > 0 ? s.Daily : new List<double> { 3, 5, 4, 7, 6, 9, 8, 6, 10, 9, 12, 11, 13, 15 }); _spark.Opacity = s.IsConnected ? 1 : 0.4; }
     }
 
     protected override double CardWidth => 360;
