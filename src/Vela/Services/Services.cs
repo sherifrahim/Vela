@@ -35,6 +35,7 @@ public static class Services
     static readonly Lazy<CodexConnector> _codex = new(() => new CodexConnector());
     static readonly Lazy<GitHubConnector> _github = new(() => new GitHubConnector());
     static readonly Lazy<StripeConnector> _stripe = new(() => new StripeConnector());
+    static readonly Lazy<NotificationService> _notes = new(() => new NotificationService());
     // Account widgets (finance, analytics, developer, online, stocks): cheap to create; they only poll while a widget listens.
     static readonly Lazy<MetricConnector[]> _accounts = new(() => new MetricConnector[]
     {
@@ -42,6 +43,7 @@ public static class Services
         new DeepSeekConnector(), new PlausibleConnector(), new DubConnector(), new LinearConnector(), new SupabaseConnector(), new ResendConnector(),
         new YouTubeConnector(), new LeetCodeConnector(), new GitHubActivityConnector(), new GitHubOverviewConnector(), new FinnhubConnector(),
         new GmailConnector(), new SearchConsoleConnector(), new GlmConnector(), new OpenCodeConnector(),
+        new CalendarConnector(),
     });
 
     public static SystemMonitor Sys => _sys.Value;
@@ -66,6 +68,7 @@ public static class Services
     public static CodexConnector Codex => _codex.Value;
     public static GitHubConnector GitHub => _github.Value;
     public static StripeConnector Stripe => _stripe.Value;
+    public static NotificationService Notifications => _notes.Value;
     public static IReadOnlyList<MetricConnector> Accounts => _accounts.Value;
     public static MetricConnector Account(string id) => Accounts.First(a => a.Id == id);
 

@@ -40,7 +40,7 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [x] Live window previews on hover (DWM thumbnails, click to switch, ✕ to close) — verified
 - [x] Jump lists (pinned / recent / frequent / tasks) in app menus — verified (Brave)
 - [x] End task for hung windows (`IsHungAppWindow`; menu item only when not responding)
-- [ ] App badges (unread counts) — needs notification access; investigate `UserNotificationListener` with a sparse package identity
+- [x] App badges (unread counts) — `UserNotificationListener` works unpackaged (access "Allowed"); `Services/NotificationService.cs`
 - [ ] Drag files/folders onto the dock to pin; drag files over an app to bring it forward
 - [ ] App groups / folder stacks; Trash on the dock
 - [ ] Win+T keyboard navigation (RegisterHotKey + focusable app strip)
@@ -56,7 +56,7 @@ Todo, roughly by value:
 - [x] Wi-Fi card (scan, connect with key, disconnect) + Bluetooth card (paired + battery %, discovery, pair, remove) — verified
 - [x] Control Centre (Windows quick settings: radios, airplane, dark mode, mic, battery saver, power mode, brightness, volume)
 - [x] System Monitor (CPU / GPU / RAM / network + card with top processes)
-- [ ] Calendar next event — Windows `Appointments` API needs package identity; Google Calendar via OAuth later
+- [x] Calendar next event — private iCal links (Google / Outlook / iCloud), `Connectors/CalendarConnector.cs` + `Ics` parser
 - [x] Volume card: per-app mixer (IAudioSessionManager2) + output device switch (IPolicyConfig) — `Services/AudioMixer.cs`, read on demand
 - [ ] Connect/disconnect paired Bluetooth audio (no public API; investigate KS reconnect like ToothTray)
 - [ ] Do Not Disturb toggle (Focus Assist: `WNF`/quiet hours APIs — research), Keyboard (osk.exe), Language (keyboard layout switch)
@@ -91,7 +91,7 @@ Todo, roughly by value:
       opt-in Windhawk mod in `extras/` and document the risk.
 
 ## P2 — notifications & automations
-- [ ] Notification listener (badges, WhatsApp tile) — requires package identity (sparse MSIX) → research
+- [x] Notification listener (badges, WhatsApp tile, Notifications count) — no package identity needed
 - [ ] Automations: AI limit warning toast, timer/pomodoro end toast (currently a system sound), quiet hours
 - [~] Global hotkeys: Alt+T = PowerShell as admin (owner chose this over the reference's Alt+T todos; `AdminShellHotkey`, main dock owns it). Win+T apps still open (Explorer owns Win+T)
 

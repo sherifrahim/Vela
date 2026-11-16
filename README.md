@@ -15,10 +15,12 @@ no Electron, no Chromium. Idle cost: ~0 % CPU, ~40 MB working set.
 - **100+ widgets** in 13 categories:
   - *Clocks & productivity:* clock, big/flip/analog/segment clocks, world clocks and world time, date, today,
     7 days, day timeline, day/month/year progress, calendar, screen time, pomodoro, timer, stopwatch, todos,
-    notes, currency.
+    notes, currency; the calendar shows your Google, Outlook or iCloud events from their private iCal links.
   - *System:* CPU/RAM/network, top CPU/RAM, five battery styles, Wi-Fi/Bluetooth toggles, Control Centre,
     brightness, theme toggle, keyboard, input language, notifications, show desktop, Task Manager, terminal.
   - *Apps & files:* recently opened, search, commands, screenshot, storage, recycle bin, downloads stack.
+  - *Notifications:* unread badges on dock icons, a notifications tile and a WhatsApp tile (Windows asks once for
+    notification access).
   - *Media:* now playing (5 layouts), a sound card with output switching and a per-app volume mixer, microphone.
   - *Accounts (paste a key, kept encrypted on this PC):* Claude and ChatGPT/Codex plan limits, Claude tokens,
     DeepSeek, GLM, OpenCode; Stripe, Polar, Lemon Squeezy, Paddle, Gumroad, Shopify, Dodo and total revenue; Plausible, Dub;

@@ -56,6 +56,12 @@ warnings.
 - Gmail + Search Console (own Google OAuth client, PKCE, loopback listener; `GoogleAuth`), GLM Coding Plan, OpenCode
   (local history). `MetricConnector` gained NeedsSignIn / SignInAsync / Disconnect and local (no-key) connectors.
   Tests 17/17 (OpenCode parser, Google loopback). Now 95 of 109; see docs/PARITY.md for what each still needs.
+- Notifications (owner granted permission): `Services/NotificationService.cs` uses `UserNotificationListener`, which
+  works **unpackaged** (access was already "Allowed"); polls every 4 s only while subscribed. App badges on dock icons
+  (match by AUMID, by packaged-app install folder, or by name; `AppBadges` setting), Notifications tile with count +
+  list (dismiss / clear all), WhatsApp tile (unread chats + latest message). Verified live: Claude 1, ChatGPT 6.
+- Calendar events via private iCal links (Google / Outlook / iCloud), `Ics` parser (RRULE, EXDATE, RECURRENCE-ID,
+  TZID, all-day); the Calendar tile shows the next event. Tests 24/24. No real iCal link tried yet. Now 96 of 109.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

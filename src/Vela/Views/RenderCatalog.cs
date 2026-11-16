@@ -18,7 +18,7 @@ namespace Vela.Views;
 public static class RenderCatalog
 {
     /// <summary>Widgets that show personal data (location, process names, recent files): left out of --public renders.</summary>
-    static readonly HashSet<string> Personal = new() { "weather", "weather.status", "weather.sun", "topcpu", "topram", "recent", "downloads", "sysmon" };
+    static readonly HashSet<string> Personal = new() { "weather", "weather.status", "weather.sun", "topcpu", "topram", "recent", "downloads", "sysmon", "whatsapp", "calendar", "notifications" };
 
     /// <param name="publicSafe">For screenshots that get published: skip <see cref="Personal"/> widgets and the cards.</param>
     public static void Run(string dir, string? theme, bool publicSafe = false)

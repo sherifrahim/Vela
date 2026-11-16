@@ -29,6 +29,7 @@ public sealed class AppSettings
     public bool Magnification { get; set; }            // macOS-style icon magnification on hover (off in the reference)
     public bool LockDock { get; set; }                 // widgets, apps and the bar edge move only while the widget picker is open
     public string OpenIndicator { get; set; } = "dot"; // running-app mark under icons: dot | large | line (reference 1.2.20)
+    public bool AppBadges { get; set; } = true;        // unread counts from Action Center on dock icons (reference app badges)
     public bool AdminShellHotkey { get; set; } = true; // Alt+T opens PowerShell as administrator from anywhere
     public bool AppTiles { get; set; } = false;       // each app icon in its own tile; false (default) = loose icons on the glass, like the reference and macOS
     public bool Island { get; set; } = true;          // Vela Island: Dynamic-Island-style activity pill at the top of the main display

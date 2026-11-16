@@ -269,14 +269,28 @@ public sealed class CalendarWidget : WidgetBase
         _n.Margin = new Thickness(0, -2, 0, 0);
         var page = new Border { Width = 30, Height = 32, CornerRadius = new CornerRadius(7), Child = V(_wd, _n) }.Bg("Fill.Control");
         _title = Text("", 10, FontWeights.Bold);
+        _title.MaxWidth = 150;
         _sub = Text("", 8, null, "Text.Secondary");
         return H(page, V(_title, _sub).Margin(9, 0, 4, 0));
     }
+
+    static Connectors.CalendarConnector Cal => (Connectors.CalendarConnector)Svc.Account("calendar");
+    protected override void OnAttach() { Cal.Changed += Render; Render(); }
+    protected override void OnDetach() => Cal.Changed -= Render;
+    void Render() => OnTick(DateTime.Now);
 
     protected override void OnTick(DateTime now)
     {
         _wd.Text = now.ToString("ddd", CultureInfo.CurrentCulture).ToUpperInvariant();
         _n.Text = now.Day.ToString();
+        // Connected (iCal links): the next event, like the reference tile.
+        if (Cal.IsConnected && Cal.LastUpdated != null)
+        {
+            var next = Cal.Events.FirstOrDefault(e => e.End > now && !e.AllDay) ?? Cal.Events.FirstOrDefault(e => e.End > now);
+            _title.Text = next?.Title ?? "No upcoming events";
+            _sub.Text = next != null ? Connectors.CalendarConnector.When(next) : "Click to plan your day";
+            return;
+        }
         int week = ISOWeek.GetWeekOfYear(now);
         _title.Text = now.ToString("dddd", CultureInfo.CurrentCulture);
         var end = now.Date.AddHours(18);
@@ -285,6 +299,32 @@ public sealed class CalendarWidget : WidgetBase
             : $"Week {week} · click to plan your day";
     }
 
-    protected override UIElement BuildCard() => new MonthCalendar();
+    protected override UIElement BuildCard()
+    {
+        var cal = Cal;
+        var root = new StackPanel();
+        root.Children.Add(new MonthCalendar());
+        root.Children.Add(new Border { Height = 1, Margin = new Thickness(-18, 14, -18, 12) }.Bg("Divider"));
+        if (!cal.IsConnected)
+        {
+            var link = GhostButton(Text("Show your Google, Outlook or iCloud events →", 12, FontWeights.SemiBold, "Accent"),
+                () => FlyoutWindow.Navigate(V(Card.Header("Calendar"), Card.ConnectForm(cal, FlyoutWindow.CloseCurrent))));
+            link.HorizontalAlignment = HorizontalAlignment.Left;
+            link.Padding = new Thickness(0, 2, 4, 2);
+            root.Children.Add(link);
+            return root;
+        }
+        root.Children.Add(Label("Upcoming").Margin(0, 0, 0, 6));
+        if (cal.Error != null) root.Children.Add(Text(cal.Error, 12, null, "Sys.Red").Margin(0, 0, 0, 6));
+        foreach (var e in cal.Events.Take(6))
+        {
+            var dot = new Border { Width = 4, Height = 26, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 0, 10, 0) }.Bg(e.Start <= DateTime.Now ? "Sys.Green" : "Sys.Red");
+            var title = Text(e.Title, 12.5, FontWeights.SemiBold);
+            var when = Text(Connectors.CalendarConnector.When(e) + (e.Location != null ? " · " + e.Location : ""), 11, null, "Text.Secondary");
+            root.Children.Add(Columns("auto,*", dot, V(title, when)).Margin(0, 0, 0, 8));
+        }
+        if (cal.Events.Count == 0) root.Children.Add(Text("Nothing in the next two weeks.", 12.5, null, "Text.Secondary"));
+        return root;
+    }
     protected override double CardWidth => 320;
 }

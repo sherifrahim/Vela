@@ -208,6 +208,7 @@ public sealed class SettingsWindow : GlassWindow
         Field("Open indicator", Wrap(new[] { ("dot", "Dot"), ("large", "Large dot"), ("line", "Line") }
             .Select(x => Segment(x.Item2, "indicator", s.OpenIndicator == x.Item1, () => { s.OpenIndicator = x.Item1; Settings.Save("pins"); }))),
             "The mark under apps that are open.");
+        Toggle("App badges", "Unread counts from your notifications on dock icons (WhatsApp, Discord, Mail…). Windows asks once to allow notification access.", s.AppBadges, v => { s.AppBadges = v; Settings.Save("pins"); });
         Toggle("App tiles", "Each app sits in its own tile, like the widgets. Off: loose icons like the macOS dock.", s.AppTiles, v => { s.AppTiles = v; Settings.Save("pins"); });
         Toggle("Magnification", "Icons grow under the pointer and their neighbours make room, like the macOS dock.", s.Magnification, v => { s.Magnification = v; Settings.Save("pins"); });
         Field("Magnification size", SliderRow(s.MagnifyAmount * 100, 110, 160, "%", v => { s.MagnifyAmount = Math.Round(v) / 100; Settings.Save("pins"); }));

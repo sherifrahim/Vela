@@ -78,6 +78,7 @@ public sealed class AppsWidget : WidgetBase
         Svc.Windows.ForegroundChanged += UpdateActive;
         Theming.ThemeManager.Changed += OnTheme;
         Settings.Changed += OnSettings;
+        if (Settings.Current.AppBadges && !IsPreview) Svc.Notifications.Changed += UpdateBadges;
         Rebuild();
     }
 
@@ -87,12 +88,15 @@ public sealed class AppsWidget : WidgetBase
         Svc.Windows.ForegroundChanged -= UpdateActive;
         Theming.ThemeManager.Changed -= OnTheme;
         Settings.Changed -= OnSettings;
+        Svc.Notifications.Changed -= UpdateBadges;
         if (_magRunning) { CompositionTarget.Rendering -= MagFrame; _magRunning = false; }
     }
 
     void OnSettings(string what)
     {
         if (what is not ("pins" or "apps")) return;
+        Svc.Notifications.Changed -= UpdateBadges;
+        if (Settings.Current.AppBadges && !IsPreview) Svc.Notifications.Changed += UpdateBadges;
         _items.Clear(); // fresh controls: tile style and tooltip/preview policy are constructor/bind state
         if (!Settings.Current.Magnification) _magHover = false;
         Rebuild();
@@ -195,6 +199,9 @@ public sealed class AppsWidget : WidgetBase
                 _items[g.Key] = item;
             }
             item.Bind(g.Name, g.Windows.Count, g.Windows.Any(w => w.Flashing));
+            item.BadgeAumid = g.Pin?.Aumid ?? g.Windows.FirstOrDefault(w => w.Aumid != null)?.Aumid;
+            item.BadgeName = g.Name;
+            item.BadgeExe = g.Windows.FirstOrDefault(w => w.ExePath != null)?.ExePath ?? g.Pin?.TargetPath;
             var group = g;
             item.ClearHandlers();
             item.Clicked += () => OnItemClick(group, item);
@@ -210,6 +217,14 @@ public sealed class AppsWidget : WidgetBase
             _panel.Children.Add(item);
         }
         UpdateActive();
+        UpdateBadges();
+    }
+
+    /// <summary>Unread counts from Action Center on the matching dock icons (Settings → Apps → App badges).</summary>
+    void UpdateBadges()
+    {
+        bool on = Settings.Current.AppBadges && !IsPreview;
+        foreach (var item in _items.Values) item.SetBadge(on ? Svc.Notifications.CountFor(item.BadgeAumid, item.BadgeName, item.BadgeExe) : 0);
     }
 
     void UpdateActive()
@@ -441,6 +456,18 @@ public sealed class AppItem : Grid
     // Focused app (reference): a thin accent outline around the icon, drawn with the icon so it magnifies with it.
     readonly Border _ring = new() { CornerRadius = new CornerRadius(9), BorderThickness = new Thickness(1.25), Margin = new Thickness(-4), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     UIElement? _inner;
+    // Unread badge (reference "app badges"): notification count for this app, top-right of the icon.
+    readonly Border _badge = new()
+    {
+        MinWidth = 13, Height = 13, CornerRadius = new CornerRadius(6.5), Padding = new Thickness(3.5, 0, 3.5, 0),
+        HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+        Margin = new Thickness(0, -5, -6, 0), Visibility = Visibility.Collapsed, IsHitTestVisible = false,
+    };
+    readonly TextBlock _badgeText = new() { FontSize = 7.5, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    /// <summary>What notifications are matched on (set by AppsWidget): the app's AppUserModelID and display name.</summary>
+    public string? BadgeAumid { get; set; }
+    public string? BadgeName { get; set; }
+    public string? BadgeExe { get; set; }
     readonly ContentControl _content = new() { Focusable = false, IsTabStop = false };
     readonly TranslateTransform _lift = new();
     readonly ScaleTransform _scale = new(1, 1);
@@ -503,11 +530,19 @@ public sealed class AppItem : Grid
     public void SetContent(UIElement e)
     {
         _inner = e;
-        if (_ring.Parent is Grid old) old.Children.Remove(_ring);
+        if (_ring.Parent is Grid old) { old.Children.Remove(_ring); old.Children.Remove(_badge); }
         var g = new Grid();
         g.Children.Add(_ring);
         g.Children.Add(e);
+        if (_badge.Child == null) { _badge.Child = _badgeText; _badge.Bg("Sys.Red"); }
+        g.Children.Add(_badge); // inside the icon's grid, so it magnifies and bounces with it
         _content.Content = g;
+    }
+
+    public void SetBadge(int count)
+    {
+        _badge.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _badgeText.Text = count > 9 ? "9+" : count.ToString();
     }
 
     public void ClearHandlers() { Clicked = null; MiddleClicked = null; MenuRequested = null; HoverStarted = null; HoverEnded = null; }
