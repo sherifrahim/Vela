@@ -215,8 +215,10 @@ public sealed class TrayWidget : WidgetBase
             var cell = new Border { Height = 44, CornerRadius = new CornerRadius(10), Child = img, Background = Brushes.Transparent, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = string.IsNullOrWhiteSpace(i.Tip) ? null : i.Tip };
             cell.MouseEnter += (_, _) => cell.Bg("Fill.Control");
             cell.MouseLeave += (_, _) => cell.Background = Brushes.Transparent;
-            cell.MouseLeftButtonUp += (_, e) => { e.Handled = true; FlyoutWindow.CloseCurrent(); i.Click(right: false, twice: e.ClickCount > 1); };
-            cell.MouseRightButtonUp += (_, e) => { e.Handled = true; FlyoutWindow.CloseCurrent(); i.Click(right: true); };
+            // Left: a click per press (a second press within the double-click time sends the double-click), like the Windows
+            // tray. The card stays open; it closes by itself when the app brings up its window or menu.
+            cell.MouseLeftButtonDown += (_, e) => { e.Handled = true; i.Click(right: false, twice: e.ClickCount >= 2); };
+            cell.MouseRightButtonUp += (_, e) => { e.Handled = true; i.Click(right: true); };
             grid.Children.Add(cell);
         }
         var msg = Live ? "No background apps right now." : IsPreview ? "Background apps appear here." : "Tray icons are switched off (Settings → Dock → Background apps).";

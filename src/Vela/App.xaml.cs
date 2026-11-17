@@ -81,14 +81,14 @@ public partial class App : Application
         //   --quit       close it (it restores the taskbar itself)
         //   --widgets    open the widget picker
         //   --settings   open Settings
-        var remote = e.Args.FirstOrDefault(a => a is "--quit" or "--widgets" or "--settings");
+        var remote = e.Args.FirstOrDefault(a => a is "--quit" or "--widgets" or "--settings" or "--tray-dump");
         if (remote != null)
         {
             var h = Interop.Native.FindWindow(null, "Vela Dock");
             if (h != IntPtr.Zero)
             {
                 if (remote == "--quit") Interop.Native.PostMessage(h, Interop.Native.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-                else Interop.Native.PostMessage(h, (int)DockWindow.CommandMessage, new IntPtr(remote == "--widgets" ? 1 : 2), IntPtr.Zero);
+                else Interop.Native.PostMessage(h, (int)DockWindow.CommandMessage, new IntPtr(remote switch { "--widgets" => 1, "--settings" => 2, _ => 3 }), IntPtr.Zero);
             }
             Shutdown();
             return;

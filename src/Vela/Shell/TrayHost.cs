@@ -18,6 +18,9 @@ public sealed class TrayIcon
     public string Tip { get; set; } = "";
     public ImageSource? Image { get; set; }
     public bool Hidden { get; set; }
+    /// <summary>Set for stand-ins: apps that registered their icon with Explorer only (they never re-send it).</summary>
+    public string? ExePath { get; init; }
+    public bool IsStandIn => ExePath != null;
     internal string Key => Guid != Guid.Empty ? Guid.ToString() : $"{Hwnd}:{Id}";
 
     const uint WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_RBUTTONDOWN = 0x204, WM_RBUTTONUP = 0x205,
@@ -26,11 +29,24 @@ public sealed class TrayIcon
     /// <summary>Tell the app its icon was clicked, the way the Windows tray does (versions 0–3 and 4 differ).</summary>
     public void Click(bool right, bool twice = false)
     {
-        if (CallbackMessage == 0 || !TrayHost.IsWindow(Hwnd)) return;
+        if (IsStandIn)
+        {
+            // Explorer-only icon: we can't reach its menu; opening the app again brings its window forward.
+            Log.Info($"Tray click (stand-in): {Tip} → open app");
+            if (!twice) Shell.WindowTracker.Launch(ExePath!);
+            return;
+        }
+        if (!TrayHost.IsWindow(Hwnd)) { Log.Info($"Tray click: {Tip} — its window is gone"); return; }
         TrayHost.GetWindowThreadProcessId(Hwnd, out uint pid);
+        bool explorerOwned = false;
+        try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); explorerOwned = p.ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase); } catch { }
+        Log.Info($"Tray click: {(Tip.Length > 0 ? Tip.Split((char)10)[0] : "(no tip)")} cb=0x{CallbackMessage:X} v={Version} right={right} twice={twice} explorer={explorerOwned}");
+        // Windows' own icons (security, volume, Bluetooth, network) live inside Explorer and ignore these messages.
+        if (CallbackMessage == 0 || explorerOwned) { SystemAction(); return; }
         TrayHost.AllowSetForegroundWindow(pid); // so its menu / window can come to the front
         TrayHost.GetCursorPos(out var pt);
-        var msgs = right ? new[] { WM_RBUTTONDOWN, WM_RBUTTONUP } : twice ? new[] { WM_LBUTTONDOWN, WM_LBUTTONUP, WM_LBUTTONDBLCLK, WM_LBUTTONUP } : new[] { WM_LBUTTONDOWN, WM_LBUTTONUP };
+        // The second press of a double-click is reported as DBLCLK + UP (the first press already sent DOWN + UP).
+        var msgs = right ? new[] { WM_RBUTTONDOWN, WM_RBUTTONUP } : twice ? new[] { WM_LBUTTONDBLCLK, WM_LBUTTONUP } : new[] { WM_LBUTTONDOWN, WM_LBUTTONUP };
         if (Version >= 4)
         {
             var wParam = (IntPtr)((pt.Y << 16) | (pt.X & 0xFFFF));
@@ -39,6 +55,21 @@ public sealed class TrayIcon
         }
         else
             foreach (var m in msgs) TrayHost.PostMessage(Hwnd, CallbackMessage, (IntPtr)Id, (IntPtr)m);
+    }
+
+    /// <summary>The page Windows itself would open for its built-in tray icons.</summary>
+    void SystemAction()
+    {
+        var t = Tip.ToLowerInvariant();
+        string uri =
+            t.Contains("security") || t.Contains("defender") ? "windowsdefender:" :
+            t.Contains("bluetooth") ? "ms-settings:bluetooth" :
+            t.Contains("speaker") || t.Contains("headphone") || t.Contains("volume") || t.Contains("audio") ? "ms-settings:sound" :
+            t.Contains("wi-fi") || t.Contains("network") || t.Contains("internet") || t.Contains("ethernet") ? "ms-settings:network" :
+            t.Contains("battery") || t.Contains("power") ? "ms-settings:batterysaver" :
+            t.Contains("usb") || t.Contains("eject") || t.Contains("safely remove") ? "ms-settings:usb" :
+            "ms-settings:taskbar";
+        Shell.WindowTracker.OpenUri(uri);
     }
 }
 
@@ -62,8 +93,108 @@ public sealed class TrayHost
     static uint _taskbarCreated;
     /// <summary>Vela's own TaskbarCreated broadcast; the docks ignore it (it is not an Explorer restart).</summary>
     public static DateTime SelfBroadcastUntil { get; private set; }
+    /// <summary>VELA_DEBUG_TRAY=1: log every Shell_NotifyIcon message received.</summary>
+    static readonly bool Debug = Environment.GetEnvironmentVariable("VELA_DEBUG_TRAY") == "1";
 
-    public IReadOnlyList<TrayIcon> Icons { get { lock (_lock) return _icons.Values.Where(i => !i.Hidden).ToList(); } }
+    public IReadOnlyList<TrayIcon> Icons
+    {
+        get
+        {
+            List<TrayIcon> live;
+            lock (_lock) live = _icons.Values.Where(i => !i.Hidden).ToList();
+            return live.Concat(StandIns(live)).ToList();
+        }
+    }
+
+    // ---------- stand-ins for apps that only ever registered with Explorer (Claude, iCloud…) ----------
+
+    List<TrayIcon> _standIns = new();
+    DateTime _standInsAt;
+
+    /// <summary>
+    /// Some apps (Electron apps, iCloud…) add their tray icon once and ignore "TaskbarCreated", so they never reach us.
+    /// Windows remembers every tray app in HKCU\Control Panel\NotifyIconSettings (exe path + a PNG snapshot of the
+    /// icon); show the ones whose process is running and that we don't already have live. Re-read every 20 s.
+    /// </summary>
+    IEnumerable<TrayIcon> StandIns(List<TrayIcon> live)
+    {
+        if (DateTime.Now - _standInsAt < TimeSpan.FromSeconds(20)) return Filter(_standIns, live);
+        _standInsAt = DateTime.Now;
+        var list = new List<TrayIcon>();
+        try
+        {
+            var running = System.Diagnostics.Process.GetProcesses().Select(p => { try { return p.ProcessName; } catch { return ""; } finally { p.Dispose(); } })
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            using var root = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\NotifyIconSettings");
+            if (root != null)
+                foreach (var name in root.GetSubKeyNames())
+                {
+                    using var k = root.OpenSubKey(name);
+                    if (k?.GetValue("ExecutablePath") is not string path) continue;
+                    path = KnownFolder(path);
+                    var proc = System.IO.Path.GetFileNameWithoutExtension(path);
+                    if (!running.Contains(proc) || !File.Exists(path)) continue;
+                    if (list.Any(x => x.ExePath!.Equals(path, StringComparison.OrdinalIgnoreCase))) continue;
+                    ImageSource? img = null;
+                    if (k.GetValue("IconSnapshot") is byte[] png && png.Length > 0)
+                    {
+                        try
+                        {
+                            var bi = new BitmapImage();
+                            bi.BeginInit(); bi.CacheOption = BitmapCacheOption.OnLoad; bi.StreamSource = new MemoryStream(png); bi.EndInit(); bi.Freeze();
+                            img = bi;
+                        }
+                        catch { }
+                    }
+                    var tip = k.GetValue("InitialTooltip") as string;
+                    list.Add(new TrayIcon { Hwnd = IntPtr.Zero, Id = 0, ExePath = path, Image = img, Tip = string.IsNullOrWhiteSpace(tip) ? proc : tip });
+                }
+        }
+        catch (Exception ex) { Log.Warn("Tray stand-ins: " + ex.Message); }
+        _standIns = list;
+        return Filter(list, live);
+    }
+
+    /// <summary>Drop stand-ins whose app already has a live icon.</summary>
+    static IEnumerable<TrayIcon> Filter(List<TrayIcon> standIns, List<TrayIcon> live)
+    {
+        var liveProcs = live.Select(i =>
+        {
+            GetWindowThreadProcessId(i.Hwnd, out uint pid);
+            try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); return p.ProcessName; } catch { return ""; }
+        }).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return standIns.Where(s => !liveProcs.Contains(System.IO.Path.GetFileNameWithoutExtension(s.ExePath!)));
+    }
+
+    /// <summary>Windows stores some paths as "{KNOWNFOLDERID}\rest"; turn the common ones back into real paths.</summary>
+    static string KnownFolder(string path)
+    {
+        if (!path.StartsWith('{')) return path;
+        int end = path.IndexOf('}');
+        if (end < 0) return path;
+        var id = path[1..end].ToUpperInvariant();
+        string? folder = id switch
+        {
+            "6D809377-6AF0-444B-8957-A3773F02200E" => Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E" => Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            "F38BF404-1D43-42F2-9305-67DE0B28FC23" => Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "1AC14E77-02E7-4E5D-B744-2EB1AE5198B7" => Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "D65231B0-B2F1-4857-A4CE-A8E7C6EA7D27" => Environment.GetFolderPath(Environment.SpecialFolder.SystemX86),
+            _ => null,
+        };
+        return folder == null ? path : folder + path[(end + 1)..];
+    }
+
+    /// <summary>`Vela.exe --tray-dump`: what each icon told us (handle, callback, version), for diagnosing clicks.</summary>
+    public void LogIcons()
+    {
+        lock (_lock)
+        {
+            Log.Info($"Tray host: {_icons.Count} icons (running: {Running})");
+            foreach (var i in _icons.Values)
+                Log.Info($"  icon hwnd=0x{i.Hwnd.ToInt64():X} alive={IsWindow(i.Hwnd)} id={i.Id} cb=0x{i.CallbackMessage:X} v={i.Version} hidden={i.Hidden} guid={(i.Guid == Guid.Empty ? "-" : "set")} tip={(i.Tip.Length > 0 ? i.Tip.Split((char)10)[0] : "")}");
+        }
+    }
     public bool Running => _hwnd != IntPtr.Zero;
 
     public event Action? Changed
@@ -196,6 +327,7 @@ public sealed class TrayHost
                 if (cds.dwData == (IntPtr)1 && cds.lpData != IntPtr.Zero) OnNotifyIcon(cds);
             }
             catch (Exception ex) { Log.Warn("Tray host: " + ex.Message); }
+            if (Debug) { try { var c = Marshal.PtrToStructure<COPYDATASTRUCT>(lParam); Log.Info($"Tray copydata dwData={c.dwData} cb={c.cbData}"); } catch { } }
             return Forward(msg, wParam, lParam, fallback: (IntPtr)1);
         }
         if (msg >= WM_USER) return Forward(msg, wParam, lParam, fallback: IntPtr.Zero);
@@ -219,8 +351,10 @@ public sealed class TrayHost
     void OnNotifyIcon(COPYDATASTRUCT cds)
     {
         int size = cds.cbData;
+        if (Debug && size < 8 + 24) Log.Info($"Tray msg too small: {size}");
         if (size < 8 + 24) return;
         var p = cds.lpData;
+        if (Debug) Log.Info($"Tray msg: size={size} sig=0x{Marshal.ReadInt32(p, 0):X} msg={Marshal.ReadInt32(p, 4)} hwnd=0x{Marshal.ReadInt32(p, 12):X}");
         if (Marshal.ReadInt32(p, 0) != 0x34753423) return; // SHELLTRAYDATA signature
         uint message = (uint)Marshal.ReadInt32(p, 4);
         var n = p + 8;

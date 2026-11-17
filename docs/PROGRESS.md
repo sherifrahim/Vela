@@ -91,6 +91,12 @@ warnings.
   8 icons arrived live. `Settings.TrayHost` is now on by default as a kill switch (Settings → Dock → Background apps);
   the host only runs while a Tray tile is on a dock. Not yet verified: clicking icons (left / right / double) for every
   app, and Win+X / Win+A with the host on.
+- Tray clicks: the card closed on the first click so double-clicks never reached apps (fixed: left press = click,
+  second press = double-click, card stays open); Windows' own icons (no callback / owned by explorer.exe) open the
+  matching Settings / Windows Security page instead. Electron apps (Claude) and iCloud never re-send their icon after
+  "TaskbarCreated" (confirmed with VELA_DEBUG_TRAY=1 + a direct post), so the tray also shows **stand-ins** from
+  HKCU "Control Panel/NotifyIconSettings" (running exe + icon snapshot): left-click relaunches the app (brings its
+  window), no menu. `Vela.exe --tray-dump` logs every icon. Owner verified left-click opens apps.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

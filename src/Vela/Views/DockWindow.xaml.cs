@@ -894,6 +894,7 @@ public partial class DockWindow : GlassWindow
         {
             if (wParam.ToInt32() == 1) Dispatcher.BeginInvoke(OpenWidgetPicker);
             else if (wParam.ToInt32() == 2) Dispatcher.BeginInvoke(OpenSettings);
+            else if (wParam.ToInt32() == 3 && Svc.TrayCreated) Dispatcher.BeginInvoke(Svc.Tray.LogIcons); // --tray-dump (diagnostics)
             handled = true;
         }
         else if (msg == WM_MOUSEACTIVATE)
