@@ -76,6 +76,15 @@ warnings.
   before. `tools/dev.ps1` now waits for the old dock to exit (it used a fixed 3 s and could leave no dock) and starts
   the new one with --wait-for-exit. Notification log spam fixed (event subscription tried once). Not yet verified
   through a real sign-in.
+- **Tray icons (owner request) — experimental, OFF.** `Shell/TrayHost.cs` registers a second hidden top-most
+  `Shell_TrayWnd` on its own thread, records Shell_NotifyIcon data (WM_COPYDATA 1) and forwards every WM_COPYDATA and
+  WM_USER+ message to Explorer's tray; `TrayWidget` shows the icons in a grid and passes clicks back (v0–3 / v4
+  callback formats). It worked (icons arrived, appbars kept working) **but the Windows key / Start stopped working**:
+  Windows 11's Start evidently looks up its taskbar by class too and found Vela's 0×0 window. Rolled back within
+  minutes; now behind `Settings.TrayHost` (default false). TaskbarController now always targets Explorer's window
+  (`TrayHost.ExplorerTray()`). Next attempts, safest first: (1) read Explorer's notification area through UI
+  Automation (names + Invoke; icons from the app exe) with no window of our own; (2) if keeping the host, give the
+  window Explorer's taskbar rect/monitor and forward *all* messages, then test Win key, Win+X, Win+A, Start button.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

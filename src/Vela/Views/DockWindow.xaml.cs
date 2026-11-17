@@ -878,7 +878,7 @@ public partial class DockWindow : GlassWindow
         {
             Svc.Windows.HandleShellMessage(wParam, lParam);
         }
-        else if (msg == _taskbarCreatedMsg && msg != 0)
+        else if (msg == _taskbarCreatedMsg && msg != 0 && DateTime.Now > TrayHost.SelfBroadcastUntil) // not our own tray host's broadcast
         {
             Log.Info("Explorer restarted; re-applying taskbar + appbar");
             if (IsPrimary) Svc.Taskbar.OnExplorerRestarted();

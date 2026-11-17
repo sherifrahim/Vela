@@ -36,6 +36,7 @@ public static class Services
     static readonly Lazy<GitHubConnector> _github = new(() => new GitHubConnector());
     static readonly Lazy<StripeConnector> _stripe = new(() => new StripeConnector());
     static readonly Lazy<NotificationService> _notes = new(() => new NotificationService());
+    static readonly Lazy<TrayHost> _tray = new(() => new TrayHost());
     // Account widgets (finance, analytics, developer, online, stocks): cheap to create; they only poll while a widget listens.
     static readonly Lazy<MetricConnector[]> _accounts = new(() => new MetricConnector[]
     {
@@ -69,6 +70,8 @@ public static class Services
     public static GitHubConnector GitHub => _github.Value;
     public static StripeConnector Stripe => _stripe.Value;
     public static NotificationService Notifications => _notes.Value;
+    public static TrayHost Tray => _tray.Value;
+    public static bool TrayCreated => _tray.IsValueCreated;
     public static IReadOnlyList<MetricConnector> Accounts => _accounts.Value;
     public static MetricConnector Account(string id) => Accounts.First(a => a.Id == id);
 

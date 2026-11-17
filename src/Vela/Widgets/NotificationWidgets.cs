@@ -155,3 +155,65 @@ public sealed class WhatsAppWidget : WidgetBase
         return V(header, list, Card.Footer("From WhatsApp's notifications on this PC.", "Open WhatsApp", OpenApp));
     }
 }
+
+/// <summary>
+/// Background apps' tray icons (the notification area / hidden-icons flyout), reference "Tray" tile. Click: a grid of
+/// icons; left-click, double-click and right-click go to each app exactly as from the Windows tray.
+/// </summary>
+public sealed class TrayWidget : WidgetBase
+{
+    TextBlock _count = null!;
+
+    protected override UIElement BuildContent()
+    {
+        Tile.Width = TileHeight;
+        Tile.Padding = new Thickness(0);
+        _count = Text("", 7, FontWeights.Bold, "Text.Secondary");
+        _count.HorizontalAlignment = HorizontalAlignment.Right;
+        _count.VerticalAlignment = VerticalAlignment.Bottom;
+        _count.Margin = new Thickness(0, 0, 7, 5);
+        var g = new Grid();
+        g.Children.Add(Icon(Glyphs.AllApps, 14).Center());
+        g.Children.Add(_count);
+        ToolTip = "Background apps";
+        return g;
+    }
+
+    // Previews (picker, --render) must not take over the tray.
+    // Experimental: the tray host breaks the Windows key / Start on Windows 11 (Start finds its taskbar by the same
+    // window class). Runs only with Settings.TrayHost = true; otherwise the card explains.
+    bool Live => !IsPreview && Settings.Current.TrayHost;
+    protected override void OnAttach() { if (!Live) { Render(); return; } Svc.Tray.Changed += Render; Render(); }
+    protected override void OnDetach() { if (Live) Svc.Tray.Changed -= Render; }
+
+    void Render()
+    {
+        int n = Live ? Svc.Tray.Icons.Count : 0;
+        _count.Text = n > 0 ? n.ToString() : "";
+        if (CardOpen) FlyoutWindow.Navigate(BuildCard());
+    }
+
+    protected override double CardWidth => 300;
+    protected override UIElement BuildCard()
+    {
+        var icons = Live ? Svc.Tray.Icons.ToList() : new List<TrayIcon>();
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 5, Margin = new Thickness(-4, 0, -4, 0) };
+        foreach (var icon in icons)
+        {
+            var i = icon;
+            var img = new Image { Source = i.Image, Width = 20, Height = 20 };
+            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            var cell = new Border { Height = 44, CornerRadius = new CornerRadius(10), Child = img, Background = Brushes.Transparent, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = string.IsNullOrWhiteSpace(i.Tip) ? null : i.Tip };
+            cell.MouseEnter += (_, _) => cell.Bg("Fill.Control");
+            cell.MouseLeave += (_, _) => cell.Background = Brushes.Transparent;
+            cell.MouseLeftButtonUp += (_, e) => { e.Handled = true; FlyoutWindow.CloseCurrent(); i.Click(right: false, twice: e.ClickCount > 1); };
+            cell.MouseRightButtonUp += (_, e) => { e.Handled = true; FlyoutWindow.CloseCurrent(); i.Click(right: true); };
+            grid.Children.Add(cell);
+        }
+        var msg = Live ? "No background apps right now." : IsPreview ? "Background apps appear here." : "Not available yet: showing tray icons this way stopped the Windows key from opening Start, so it is switched off while a safer way is built.";
+        var none = Text(msg, 12.5, null, "Text.Secondary");
+        none.TextWrapping = TextWrapping.Wrap;
+        var body = icons.Count > 0 ? (UIElement)grid : none;
+        return V(Card.Header("Background apps", null, icons.Count > 0 ? icons.Count.ToString() : null), body);
+    }
+}

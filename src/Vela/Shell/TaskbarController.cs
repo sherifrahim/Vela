@@ -79,7 +79,8 @@ public sealed class TaskbarController
 
     static IEnumerable<IntPtr> TaskbarWindows()
     {
-        var main = FindWindow("Shell_TrayWnd", null);
+        // Explorer's taskbar specifically: while a Tray widget is on, Vela owns another (hidden) Shell_TrayWnd.
+        var main = TrayHost.ExplorerTray();
         if (main != IntPtr.Zero) yield return main;
         var h = IntPtr.Zero;
         while ((h = FindWindowEx(IntPtr.Zero, h, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
@@ -93,7 +94,7 @@ public sealed class TaskbarController
 
     static int GetState()
     {
-        var d = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = FindWindow("Shell_TrayWnd", null) };
+        var d = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = TrayHost.ExplorerTray() };
         return SHAppBarMessage(ABM_GETSTATE, ref d).ToInt32();
     }
 
@@ -102,7 +103,7 @@ public sealed class TaskbarController
         var d = new APPBARDATA
         {
             cbSize = Marshal.SizeOf<APPBARDATA>(),
-            hWnd = FindWindow("Shell_TrayWnd", null),
+            hWnd = TrayHost.ExplorerTray(),
             lParam = new IntPtr(state),
         };
         SHAppBarMessage(ABM_SETSTATE, ref d);

@@ -171,6 +171,7 @@ public partial class App : Application
         }
         finally
         {
+            Stage("stop tray host", () => { if (Svc.TrayCreated) Svc.Tray.Stop(); }); // Explorer is the only tray again
             Stage("restore taskbar", Svc.Taskbar.Restore);
             try { Log.Info(clean ? "Vela stopped cleanly" : "Vela stopped (with cleanup errors; taskbar restored)"); } catch { }
             try { _singleInstance?.ReleaseMutex(); } catch { }

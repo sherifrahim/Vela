@@ -65,6 +65,7 @@ public static class WidgetRegistry
         new("brightness", "Brightness", "System", () => new BrightnessWidget()),
         new("themetoggle", "Theme Toggle", "System", () => new ActionWidget(ActionWidget.Kind.Theme)),
         new("notifications", "Notifications", "System", () => new NotificationsWidget()),
+        new("tray", "Tray", "System", () => new TrayWidget()),
         new("showdesktop", "Show Desktop", "System", () => new ActionWidget(ActionWidget.Kind.ShowDesktop)),
         new("taskmanager", "Task Manager", "System", () => new ActionWidget(ActionWidget.Kind.TaskManager)),
         new("terminal", "Terminal", "System", () => new TerminalWidget()),
