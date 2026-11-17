@@ -227,12 +227,21 @@ public static class ScreenEvents
     delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint pid, uint tid, uint flags);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
-    const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B, EVENT_SYSTEM_MINIMIZEEND = 0x0017, EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+    const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B, EVENT_SYSTEM_MINIMIZEEND = 0x0017;
 
     static readonly WinEventProc Proc = OnEvent; // kept alive for the native side
-    static IntPtr _move, _loc;
+    static IntPtr _move;
     static Action? _changed;
+    static IntPtr _fg;
+    static Native.RECT _fgRect;
+    static bool _fgZoomed;
 
+    /// <summary>
+    /// Something on screen moved: a drag or resize ended, a window was minimised / restored (instant, via WinEvents), or
+    /// the foreground window changed size or position (checked once a second on the shared ticker). There is deliberately
+    /// no EVENT_OBJECT_LOCATIONCHANGE hook: Windows raises it for the mouse cursor on every movement, which woke the
+    /// docks hundreds of times a second while gaming (≈1 % CPU) only to be filtered out.
+    /// </summary>
     public static event Action? Changed
     {
         add
@@ -241,22 +250,34 @@ public static class ScreenEvents
             _changed += value;
             if (!first) return;
             _move = SetWinEventHook(EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MINIMIZEEND, IntPtr.Zero, Proc, 0, 0, 0 /*OUTOFCONTEXT*/);
-            _loc = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, Proc, 0, 0, 0);
+            Svc.Ticker.Tick += CheckForeground;
         }
         remove
         {
             _changed -= value;
             if (_changed != null) return;
             if (_move != IntPtr.Zero) UnhookWinEvent(_move);
-            if (_loc != IntPtr.Zero) UnhookWinEvent(_loc);
-            _move = _loc = IntPtr.Zero;
+            _move = IntPtr.Zero;
+            Svc.Ticker.Tick -= CheckForeground;
         }
+    }
+
+    static void CheckForeground(DateTime now)
+    {
+        var fg = Native.GetForegroundWindow();
+        if (fg == IntPtr.Zero) return;
+        GetWindowThreadProcessId(fg, out uint pid);
+        if (pid == OwnPid) return;
+        Native.GetWindowRect(fg, out var r);
+        bool zoomed = Native.IsZoomed(fg);
+        bool changed = fg == _fg && (r.Left != _fgRect.Left || r.Top != _fgRect.Top || r.Right != _fgRect.Right || r.Bottom != _fgRect.Bottom || zoomed != _fgZoomed);
+        (_fg, _fgRect, _fgZoomed) = (fg, r, zoomed);
+        if (changed) _changed?.Invoke(); // a new foreground window is already reported by WindowTracker.ForegroundChanged
     }
 
     static void OnEvent(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
     {
         if (idObject != 0 || idChild != 0 || hwnd == IntPtr.Zero) return; // OBJID_WINDOW of a window, not carets/cursors
-        if (ev == EVENT_OBJECT_LOCATIONCHANGE && GetAncestor(hwnd, 2 /*GA_ROOT*/) != hwnd) return;
         // Ignore Vela's own windows (docks, blur backdrops, cards, island): moving them must not wake the docks.
         GetWindowThreadProcessId(hwnd, out uint pid);
         if (pid == OwnPid) return;

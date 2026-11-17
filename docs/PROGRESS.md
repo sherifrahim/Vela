@@ -66,6 +66,9 @@ warnings.
   notifications. Badges off vs on measured 1.33 % vs 1.02 % of a core (noise) — but the whole dock now idles at ~1 %
   while the owner is active (game + apps), vs 0.26 % measured earlier when idle. **Next up: profile idle CPU on a quiet
   PC** (WinEvent hook traffic? adaptive sampler? Claude log scan?) and get it back under 0.5 %.
+- Found it: the EVENT_OBJECT_LOCATIONCHANGE hook (ScreenEvents) also fires for the mouse cursor on every movement.
+  Replaced with a 1 Hz foreground-window rect check on the shared ticker (MOVESIZE/MINIMIZE hooks stay). Measured
+  while the owner was active: 1.0–1.3 % → 0.55 % of a core, 68 → 57 MB. Next: profile the remaining 0.5 % on a quiet PC.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category
