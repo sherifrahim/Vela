@@ -56,7 +56,7 @@ public static class RenderCatalog
         if (publicSafe) { Log.Info($"Rendered (public) dock + {catalog.Count} widgets to {dir}"); return; }
         // 3) A few cards (solid, as they open over the dock).
         var cards = new WrapPanel { Width = 1500 };
-        foreach (var type in new[] { "commands", "recent", "terminal", "volume", "linear", "revenue.total" })
+        foreach (var type in new[] { "stocks.chart", "wallpapers", "terminal", "volume", "commands", "recent" })
         {
             var w = catalog.FirstOrDefault(c => c.Instance?.Type == type);
             if (w?.CardForRender() is not { } content) continue;

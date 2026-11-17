@@ -102,6 +102,10 @@ warnings.
 - Idle CPU: Explorer's taskbar lookup (FindWindowEx + Process per call) ran every second and for every forwarded
   tray message; now cached (re-found only when the window dies). Measured with tray + badges + notifications on:
   0.27 % of a core, 66 MB.
+- Stock Chart (Yahoo Finance public chart endpoint, no key; card with symbol box + 1D/5D/1M/6M/1Y) and Wallpaper
+  Gallery (Unsplash access key; click a photo → SystemParametersInfo wallpaper; photographer credit + download ping).
+  Temperature: this PC exposes no thermal zones to normal users (perf counters empty, MSAcpi unsupported) — needs a
+  driver, left out. Do Not Disturb: no public toggle API. Now 99 of 109.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

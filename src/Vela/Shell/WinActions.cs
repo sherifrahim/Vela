@@ -31,6 +31,17 @@ public static class WinActions
     public static void OpenQuickSettings() => SendKeys(VK_LWIN, 0x41 /*A*/);
     public static void OpenTaskManager() => WindowTracker.Launch("taskmgr.exe");
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
+
+    /// <summary>Set the desktop wallpaper (all displays), saved to the user profile like the Settings app does.</summary>
+    public static void SetWallpaper(string path)
+    {
+        const uint SPI_SETDESKWALLPAPER = 0x0014, SPIF_UPDATEINIFILE = 0x01, SPIF_SENDCHANGE = 0x02;
+        if (!SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE))
+            Log.Warn("Set wallpaper failed: " + System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+    }
+
     public enum ShellKind { PowerShell, Cmd }
 
     static string? _pwsh;

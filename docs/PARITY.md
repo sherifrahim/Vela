@@ -6,23 +6,23 @@ Checked 2026-11-17 against lumabar.xyz (home, /widgets, /docs, /changelog, /term
 no trial. Every widget and feature comes with the one license; there is no free/paid split. So "everything it
 charges for" = the whole app below.
 
-## Widgets: 97 of 109
+## Widgets: 99 of 109
 
 | Category (theirs) | Have | Missing |
 |---|---|---|
 | Clocks (11) | 11 | — |
 | Productivity (10) | 10 | — (Calendar shows Google/Outlook/iCloud events through private iCal links) |
-| System (23) | 21 | Temperature, Do Not Disturb |
+| System (23) | 21 | Temperature (no thermal data without a kernel driver on this PC), Do Not Disturb (no public API to toggle it) |
 | Media & Audio (6) | 6 | — |
 | AI (11) | 7 | Gemini (reads the Antigravity sign-in), Grok (SuperGrok has no public usage API), OpenCode Plan, Cursor (session lives in its SQLite store) |
 | Finance (15) | 15 | — |
 | Analytics (4) | 3 | DataFast |
 | Developer (3) | 3 | — |
-| Online & Mail (6) | 5 | Wallpaper Gallery (Unsplash) |
+| Online & Mail (6) | 6 | — |
 | Social (4) | 1 | X, TikTok, Instagram (their APIs need paid / reviewed developer apps) |
 | Apps & Files (7) | 7 | — |
 | Weather (6) | 6 | — |
-| Stocks (3) | 2 | Stock Chart (Finnhub candles are a paid endpoint; needs another source) |
+| Stocks (3) | 3 | — (Stock Chart uses Yahoo Finance's public chart data, no key) |
 
 Account widgets added 2026-11-17 (`Connectors/AccountConnectors.cs`, `Widgets/AccountWidgets.cs`): Polar, Lemon
 Squeezy, Paddle, Gumroad, Shopify, Dodo (+ chart variants), Total Revenue, DeepSeek, Plausible, Dub, Linear,

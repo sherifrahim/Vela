@@ -676,3 +676,59 @@ public sealed class GitHubOverviewConnector : MetricConnector
             .Select(r => new MetricRow(Str(r, "name") ?? "repo", "★ " + Count(Num(r, "stargazers_count")), Str(r, "html_url"))));
     }
 }
+
+public sealed record WallPhoto(string Id, string Thumb, string Full, string Author, string AuthorUrl, string DownloadLocation, string Page);
+
+/// <summary>
+/// Unsplash photos for the Wallpaper Gallery (free "Access key" from unsplash.com/developers). Follows Unsplash's API
+/// guidelines: hotlinked thumbnails, photographer credit with links, and a ping to download_location when one is used.
+/// </summary>
+public sealed class UnsplashConnector : MetricConnector
+{
+    public override string Id => "unsplash";
+    public override string Name => "Unsplash";
+    public override string Description => "Wallpapers from Unsplash. Create a free app at unsplash.com/developers and paste its Access Key.";
+    public override string KeyHint => "Access Key";
+    public override string? HelpUrl => "https://unsplash.com/oauth/applications";
+    public override string BadgeColor => "#111111";
+    public override string BadgeText => "U";
+    public override string Unit => "wallpapers";
+    public override string SampleValue => "6 new";
+    protected override TimeSpan Interval => TimeSpan.FromHours(6);
+    public List<WallPhoto> Photos { get; private set; } = new();
+    public string Topic { get; set; } = "nature,landscape";
+
+    protected override async Task FetchMetricAsync(string key)
+    {
+        var url = $"https://api.unsplash.com/photos/random?count=8&orientation=landscape&content_filter=high&query={Uri.EscapeDataString(Topic)}";
+        using var doc = await Http.GetJsonAsync(url, r => r.Headers.TryAddWithoutValidation("Authorization", "Client-ID " + key));
+        Photos = doc.RootElement.EnumerateArray().Select(p =>
+        {
+            var urls = p.GetProperty("urls");
+            var user = p.GetProperty("user");
+            return new WallPhoto(Str(p, "id") ?? "", Str(urls, "small") ?? "", Str(urls, "full") ?? Str(urls, "raw") ?? "",
+                Str(user, "name") ?? "Unknown", (user.TryGetProperty("links", out var ul) ? Str(ul, "html") : null) ?? "https://unsplash.com",
+                p.GetProperty("links").TryGetProperty("download_location", out var dl) ? dl.GetString() ?? "" : "",
+                (p.GetProperty("links").TryGetProperty("html", out var ph) ? ph.GetString() : null) ?? "https://unsplash.com");
+        }).Where(p => p.Thumb.Length > 0).ToList();
+        Value = $"{Photos.Count} new";
+        Sub = "wallpapers · " + Topic.Split(',')[0];
+    }
+
+    /// <summary>Download the full photo, set it as the desktop wallpaper, and tell Unsplash it was used.</summary>
+    public async Task<string> ApplyAsync(WallPhoto photo)
+    {
+        var key = Secrets.Get(SecretName!) ?? throw new InvalidOperationException("Connect Unsplash first");
+        if (photo.DownloadLocation.Length > 0)
+            try { using var _ = await Http.GetJsonAsync(photo.DownloadLocation, r => r.Headers.TryAddWithoutValidation("Authorization", "Client-ID " + key)); } catch { }
+        var dir = Paths.Dir("wallpapers");
+        var file = Path.Combine(dir, $"unsplash-{photo.Id}.jpg");
+        if (!File.Exists(file))
+        {
+            var bytes = await Http.Client.GetByteArrayAsync(photo.Full + (photo.Full.Contains('?') ? "&" : "?") + "w=3840&q=85&fm=jpg");
+            await File.WriteAllBytesAsync(file, bytes);
+        }
+        Shell.WinActions.SetWallpaper(file);
+        return file;
+    }
+}

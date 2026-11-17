@@ -116,6 +116,7 @@ public static class WidgetRegistry
         new("gumroad", "Gumroad", "Finance", () => new MetricWidget("gumroad"), "gumroad"),
         new("gumroad.chart", "Gumroad Chart", "Finance", () => new MetricWidget("gumroad", chart: true), "gumroad"),
         new("crypto", "Crypto", "Stocks", () => new CryptoWidget()),
+        new("stocks.chart", "Stock Chart", "Stocks", () => new StockChartWidget()),
         new("stocks.watchlist", "Stock Watchlist", "Stocks", () => new MetricWidget("finnhub"), "finnhub"),
         new("searchconsole", "Search Console", "Analytics", () => new MetricWidget("searchconsole", chart: true), "searchconsole"),
         new("plausible", "Plausible", "Analytics", () => new MetricWidget("plausible", chart: true), "plausible"),
@@ -138,6 +139,7 @@ public static class WidgetRegistry
         new("github.activity", "GitHub Activity", "Online & Mail", () => new MetricWidget("githubactivity", chart: true), "github"),
         new("github.overview", "GitHub Overview", "Online & Mail", () => new MetricWidget("githuboverview"), "github"),
         new("leetcode", "LeetCode Stats", "Online & Mail", () => new MetricWidget("leetcode"), "leetcode"),
+        new("wallpapers", "Wallpaper Gallery", "Online & Mail", () => new WallpaperGalleryWidget(), "unsplash"),
         new("youtube", "YouTube", "Social", () => new MetricWidget("youtube"), "youtube"),
 
         // Containers (not in the picker; created from widget menus)
