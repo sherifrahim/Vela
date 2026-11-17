@@ -180,15 +180,24 @@ public sealed class TrayWidget : WidgetBase
     }
 
     // Previews (picker, --render) must not take over the tray.
-    // Experimental: the tray host breaks the Windows key / Start on Windows 11 (Start finds its taskbar by the same
-    // window class). Runs only with Settings.TrayHost = true; otherwise the card explains.
+    // The tray host runs while a Tray tile is on a dock and Settings.TrayHost (kill switch, on by default) allows it.
     bool Live => !IsPreview && Settings.Current.TrayHost;
-    protected override void OnAttach() { if (!Live) { Render(); return; } Svc.Tray.Changed += Render; Render(); }
-    protected override void OnDetach() { if (Live) Svc.Tray.Changed -= Render; }
+    bool _hosting;
+    protected override void OnAttach() { Settings.Changed += OnSettings; Sync(); }
+    protected override void OnDetach() { Settings.Changed -= OnSettings; if (_hosting) { Svc.Tray.Changed -= Render; _hosting = false; } }
+    void OnSettings(string what) { if (what == "pins") Sync(); }
+
+    /// <summary>Start / stop listening (and with it the tray host) when the Settings kill switch changes.</summary>
+    void Sync()
+    {
+        if (Live && !_hosting) { Svc.Tray.Changed += Render; _hosting = true; }
+        else if (!Live && _hosting) { Svc.Tray.Changed -= Render; _hosting = false; }
+        Render();
+    }
 
     void Render()
     {
-        int n = Live ? Svc.Tray.Icons.Count : 0;
+        int n = _hosting ? Svc.Tray.Icons.Count : 0;
         _count.Text = n > 0 ? n.ToString() : "";
         if (CardOpen) FlyoutWindow.Navigate(BuildCard());
     }
@@ -210,7 +219,7 @@ public sealed class TrayWidget : WidgetBase
             cell.MouseRightButtonUp += (_, e) => { e.Handled = true; FlyoutWindow.CloseCurrent(); i.Click(right: true); };
             grid.Children.Add(cell);
         }
-        var msg = Live ? "No background apps right now." : IsPreview ? "Background apps appear here." : "Not available yet: showing tray icons this way stopped the Windows key from opening Start, so it is switched off while a safer way is built.";
+        var msg = Live ? "No background apps right now." : IsPreview ? "Background apps appear here." : "Tray icons are switched off (Settings → Dock → Background apps).";
         var none = Text(msg, 12.5, null, "Text.Secondary");
         none.TextWrapping = TextWrapping.Wrap;
         var body = icons.Count > 0 ? (UIElement)grid : none;

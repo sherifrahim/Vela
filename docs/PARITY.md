@@ -6,13 +6,13 @@ Checked 2026-11-17 against lumabar.xyz (home, /widgets, /docs, /changelog, /term
 no trial. Every widget and feature comes with the one license; there is no free/paid split. So "everything it
 charges for" = the whole app below.
 
-## Widgets: 96 of 109
+## Widgets: 97 of 109
 
 | Category (theirs) | Have | Missing |
 |---|---|---|
 | Clocks (11) | 11 | — |
 | Productivity (10) | 10 | — (Calendar shows Google/Outlook/iCloud events through private iCal links) |
-| System (23) | 20 | Tray, Temperature, Do Not Disturb |
+| System (23) | 21 | Temperature, Do Not Disturb |
 | Media & Audio (6) | 6 | — |
 | AI (11) | 7 | Gemini (reads the Antigravity sign-in), Grok (SuperGrok has no public usage API), OpenCode Plan, Cursor (session lives in its SQLite store) |
 | Finance (15) | 15 | — |

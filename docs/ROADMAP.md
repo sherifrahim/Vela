@@ -44,7 +44,7 @@ Pick from the top of each section. Keep ids/names in sync with `Widgets/WidgetRe
 - [ ] Drag files/folders onto the dock to pin; drag files over an app to bring it forward
 - [ ] App groups / folder stacks; Trash on the dock
 - [ ] Win+T keyboard navigation (RegisterHotKey + focusable app strip)
-- [ ] Tray icons grid (needs Shell_NotifyIcon hosting or reading the tray toolbar — research)
+- [x] Tray icons grid (`Shell/TrayHost.cs`: second Shell_TrayWnd that forwards everything to Explorer; Start verified)
 
 ## P1 — widgets
 Done (45): clock, clock.digital, date, calendar, dayprogress, monthprogress, yearprogress, screentime, pomodoro, timer,

@@ -85,6 +85,12 @@ warnings.
   (`TrayHost.ExplorerTray()`). Next attempts, safest first: (1) read Explorer's notification area through UI
   Automation (names + Invoke; icons from the app exe) with no window of our own; (2) if keeping the host, give the
   window Explorer's taskbar rect/monitor and forward *all* messages, then test Win key, Win+X, Win+A, Start button.
+- **Tray icons now work and Start keeps working** (owner tested the Windows key and Start button). Fixes taken from
+  ManagedShell (Apache-2.0, RetroBar/Cairo): the host window gets Explorer's taskbar rect (a 0×0 window broke Start), a
+  TrayNotifyWnd child, forwards WM_COMMAND / WM_ACTIVATEAPP as well, and strips SWP_SHOWWINDOW so it never shows.
+  8 icons arrived live. `Settings.TrayHost` is now on by default as a kill switch (Settings → Dock → Background apps);
+  the host only runs while a Tray tile is on a dock. Not yet verified: clicking icons (left / right / double) for every
+  app, and Win+X / Win+A with the host on.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category
