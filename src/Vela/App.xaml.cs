@@ -59,7 +59,12 @@ public partial class App : Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             int ti = Array.IndexOf(e.Args, "--theme");
-            try { RenderCatalog.Run(ri + 1 < e.Args.Length ? e.Args[ri + 1] : "render", ti >= 0 && ti + 1 < e.Args.Length ? e.Args[ti + 1] : null, e.Args.Contains("--public")); }
+            var outDir = ri + 1 < e.Args.Length ? e.Args[ri + 1] : "render";
+            try
+            {
+                if (e.Args.Contains("--poster")) PosterRenderer.Run(outDir);
+                else RenderCatalog.Run(outDir, ti >= 0 && ti + 1 < e.Args.Length ? e.Args[ti + 1] : null, e.Args.Contains("--public"));
+            }
             catch (Exception ex) { Log.Error("Render failed", ex); }
             Shutdown();
             return;

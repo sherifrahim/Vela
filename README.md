@@ -1,5 +1,7 @@
 # Vela
 
+![Vela — your Windows taskbar, reimagined](docs/screenshots/vela-poster-1-hero.png)
+
 A native widget dock for Windows 10 and 11: your apps and live widgets in one glassy bar on the bottom
 (or top) edge of the screen. While it runs, the Windows taskbar steps aside; quit Vela and it comes back
 exactly as it was.
@@ -41,6 +43,10 @@ no Electron, no Chromium. Idle cost: ~0 % CPU, ~40 MB working set.
 ![Vela dock, White style](docs/screenshots/dock-white.png)
 
 ![Vela dock, Midnight style](docs/screenshots/dock-midnight.png)
+
+![100+ live widgets](docs/screenshots/vela-poster-2-widgets.png)
+
+![Every tile opens a card](docs/screenshots/vela-poster-3-cards.png)
 
 Every widget (account widgets show sample values until connected):
 

@@ -109,8 +109,16 @@ public sealed class TrayHost
                 hInstance = GetModuleHandle(null), lpszClassName = "Shell_TrayWnd",
             };
             if (RegisterClassEx(ref wc) == 0) { Log.Warn("Tray host: RegisterClassEx failed " + Marshal.GetLastWin32Error()); return; }
-            _hwnd = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, "Shell_TrayWnd", "", WS_POPUP, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
+            var notify = wc;
+            notify.lpszClassName = "TrayNotifyWnd";
+            RegisterClassEx(ref notify);
+            // Same geometry as Explorer's taskbar (a 0×0 window broke Start, which looks up its taskbar by class and
+            // positions itself from it), Explorer-like child layout, never visible (see WM_WINDOWPOSCHANGING).
+            var r = TaskbarRect();
+            _hwnd = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, "Shell_TrayWnd", "", WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+                r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
             if (_hwnd == IntPtr.Zero) { Log.Warn("Tray host: CreateWindowEx failed " + Marshal.GetLastWin32Error()); return; }
+            CreateWindowEx(0, "TrayNotifyWnd", "", WS_CHILD, 0, 0, r.Right - r.Left, r.Bottom - r.Top, _hwnd, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
             SetWindowPos(_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             ready.Set();
             // Ask running apps to re-add their icons (they do this whenever a new taskbar appears).
@@ -124,6 +132,7 @@ public sealed class TrayHost
         {
             if (_hwnd != IntPtr.Zero) { DestroyWindow(_hwnd); _hwnd = IntPtr.Zero; }
             UnregisterClass("Shell_TrayWnd", GetModuleHandle(null));
+            UnregisterClass("TrayNotifyWnd", GetModuleHandle(null));
             ready.Set();
             Log.Info("Tray host stopped");
         }
@@ -135,6 +144,20 @@ public sealed class TrayHost
         if (_hwnd == IntPtr.Zero) return;
         var first = FindWindow("Shell_TrayWnd", null);
         if (first != _hwnd) SetWindowPos(_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        // Follow Explorer's taskbar rect (resolution / DPI / edge changes).
+        var r = TaskbarRect();
+        GetWindowRect(_hwnd, out var mine);
+        if (mine.Left != r.Left || mine.Top != r.Top || mine.Right != r.Right || mine.Bottom != r.Bottom)
+            SetWindowPos(_hwnd, IntPtr.Zero, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    /// <summary>Explorer's taskbar rectangle (it keeps one while hidden); a bottom strip of the primary screen otherwise.</summary>
+    static RECT TaskbarRect()
+    {
+        var ex = ExplorerTray();
+        if (ex != IntPtr.Zero && GetWindowRect(ex, out var r) && r.Right > r.Left && r.Bottom > r.Top) return r;
+        int w = GetSystemMetrics(0), h = GetSystemMetrics(1);
+        return new RECT { Left = 0, Top = h - 48, Right = w, Bottom = h };
     }
 
     /// <summary>Explorer's own Shell_TrayWnd (never ours): the window everything is forwarded to.</summary>
@@ -152,8 +175,19 @@ public sealed class TrayHost
 
     IntPtr WndProcImpl(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
+        if (hwnd != _hwnd && _hwnd != IntPtr.Zero) return DefWindowProc(hwnd, msg, wParam, lParam); // the TrayNotifyWnd child
         if (msg == WM_CLOSE) { DestroyWindow(hwnd); return IntPtr.Zero; }
         if (msg == WM_DESTROY) { _hwnd = IntPtr.Zero; PostQuitMessage(0); return IntPtr.Zero; }
+        if (msg == WM_WINDOWPOSCHANGING && lParam != IntPtr.Zero)
+        {
+            // Never become visible, even if someone calls ShowWindow on "the taskbar": strip SWP_SHOWWINDOW.
+            int flagsOffset = 2 * IntPtr.Size + 16; // WINDOWPOS { hwnd, hwndInsertAfter, x, y, cx, cy, flags }
+            int flags = Marshal.ReadInt32(lParam, flagsOffset);
+            if ((flags & SWP_SHOWWINDOW) != 0) Marshal.WriteInt32(lParam, flagsOffset, flags & ~SWP_SHOWWINDOW);
+            return IntPtr.Zero;
+        }
+        // Like other tray hosts that coexist with Explorer: activation and commands go to Explorer's tray too.
+        if (msg is WM_ACTIVATEAPP or WM_COMMAND) return Forward(msg, wParam, lParam, fallback: IntPtr.Zero);
         if (msg == WM_COPYDATA)
         {
             try
@@ -261,9 +295,10 @@ public sealed class TrayHost
     [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public int x, y; }
     [StructLayout(LayoutKind.Sequential)] internal struct POINT { public int X, Y; }
 
-    const uint WM_CLOSE = 0x10, WM_DESTROY = 0x2, WM_COPYDATA = 0x4A, WM_USER = 0x400, WM_QUIT = 0x12;
-    const uint WS_POPUP = 0x80000000, WS_EX_TOOLWINDOW = 0x80, WS_EX_TOPMOST = 0x8;
-    const uint SWP_NOMOVE = 0x2, SWP_NOSIZE = 0x1, SWP_NOACTIVATE = 0x10, SMTO_BLOCK = 0x1, SMTO_ABORTIFHUNG = 0x2;
+    const uint WM_CLOSE = 0x10, WM_DESTROY = 0x2, WM_COPYDATA = 0x4A, WM_USER = 0x400, WM_QUIT = 0x12, WM_ACTIVATEAPP = 0x1C, WM_COMMAND = 0x111, WM_WINDOWPOSCHANGING = 0x46;
+    const int SWP_SHOWWINDOW = 0x40;
+    const uint WS_POPUP = 0x80000000, WS_CHILD = 0x40000000, WS_CLIPCHILDREN = 0x02000000, WS_CLIPSIBLINGS = 0x04000000, WS_EX_TOOLWINDOW = 0x80, WS_EX_TOPMOST = 0x8;
+    const uint SWP_NOMOVE = 0x2, SWP_NOSIZE = 0x1, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10, SMTO_BLOCK = 0x1, SMTO_ABORTIFHUNG = 0x2;
     static readonly IntPtr HWND_TOPMOST = new(-1), HWND_BROADCAST = new(0xFFFF);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern ushort RegisterClassEx(ref WNDCLASSEX wc);
@@ -289,6 +324,9 @@ public sealed class TrayHost
     [DllImport("user32.dll")] internal static extern bool AllowSetForegroundWindow(uint pid);
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out POINT pt);
     [DllImport("user32.dll")] static extern IntPtr CopyIcon(IntPtr hIcon);
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetModuleHandle(string? name);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();

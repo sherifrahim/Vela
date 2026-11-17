@@ -75,7 +75,7 @@ public static class RenderCatalog
         Log.Info($"Rendered dock + {catalog.Count} widgets to {dir}");
     }
 
-    static Border Bar(UIElement content)
+    internal static Border Bar(UIElement content)
     {
         var tint = new Border { CornerRadius = new CornerRadius(16) }.Bg("Bar.Background");
         var shade = new Border { CornerRadius = new CornerRadius(16) }.Bg("Bar.Shade");
@@ -89,14 +89,14 @@ public static class RenderCatalog
         return b;
     }
 
-    static Border Backdrop(UIElement content) => new()
+    internal static Border Backdrop(UIElement content) => new()
     {
         Padding = new Thickness(24),
         Background = new LinearGradientBrush(Color.FromRgb(0x24, 0x3B, 0x4A), Color.FromRgb(0x0C, 0x12, 0x1A), 60),
         Child = content,
     };
 
-    static void Pump(TimeSpan t)
+    internal static void Pump(TimeSpan t)
     {
         var frame = new DispatcherFrame();
         var timer = new DispatcherTimer { Interval = t };
@@ -105,12 +105,12 @@ public static class RenderCatalog
         Dispatcher.PushFrame(frame);
     }
 
-    static void Save(FrameworkElement e, string path)
+    internal static void Save(FrameworkElement e, string path, double scale = 2)
     {
         e.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         e.Arrange(new Rect(e.DesiredSize));
         e.UpdateLayout();
-        const double scale = 2;
+
         var rtb = new RenderTargetBitmap((int)Math.Ceiling(e.ActualWidth * scale), (int)Math.Ceiling(e.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         rtb.Render(e);
         var enc = new PngBitmapEncoder();
