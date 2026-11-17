@@ -69,6 +69,13 @@ warnings.
 - Found it: the EVENT_OBJECT_LOCATIONCHANGE hook (ScreenEvents) also fires for the mouse cursor on every movement.
   Replaced with a 1 Hz foreground-window rect check on the shared ticker (MOVESIZE/MINIMIZE hooks stay). Measured
   while the owner was active: 1.0–1.3 % → 0.55 % of a core, 68 → 57 MB. Next: profile the remaining 0.5 % on a quiet PC.
+- Correction: that 0.55 % was measured on the old, still-exiting process. Per-thread sampling of the new build:
+  ~60 ms / 30 s UI thread + ~80 ms render thread (the layered dock redrawn each second) ≈ 0.5 %. Next: skip
+  redraws when no visible text changed.
+- "Doesn't start with Windows": the Run key is correct; the PC only slept (no sign-in), and Vela had been quit
+  before. `tools/dev.ps1` now waits for the old dock to exit (it used a fixed 3 s and could leave no dock) and starts
+  the new one with --wait-for-exit. Notification log spam fixed (event subscription tried once). Not yet verified
+  through a real sign-in.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category

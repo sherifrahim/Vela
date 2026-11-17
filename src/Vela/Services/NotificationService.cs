@@ -22,7 +22,7 @@ public sealed class NotificationService
     DateTime _last;
     bool _busy, _asked, _again;
     // Windows' change event when it works for this process; otherwise a slow poll. Either way, a safety re-read.
-    bool _event;
+    bool _event, _eventTried;
     int PollSeconds => _event ? 120 : 10;
     // Parsed notifications by id: a refresh only reads the texts of notifications it hasn't seen yet.
     Dictionary<uint, ToastItem> _cache = new();
@@ -53,7 +53,8 @@ public sealed class NotificationService
 
     void TryEvent()
     {
-        if (_event || _listener == null) return;
+        if (_event || _eventTried || _listener == null) return;
+        _eventTried = true; // try once: unpackaged apps get no change events, and retrying only filled the log
         try { _listener.NotificationChanged += OnNative; _event = true; Log.Info("Notifications: change events on"); }
         catch (Exception ex) { _event = false; Log.Info("Notifications: no change events here (" + ex.Message + "); polling"); }
     }
