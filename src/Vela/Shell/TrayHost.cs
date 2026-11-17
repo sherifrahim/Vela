@@ -303,7 +303,20 @@ public sealed class TrayHost
     }
 
     /// <summary>Explorer's own Shell_TrayWnd (never ours): the window everything is forwarded to.</summary>
+    static IntPtr _explorerTray;
+
+    /// <summary>
+    /// Cached: this is asked every second (taskbar enforcement, tray geometry) and for every forwarded message; it only
+    /// changes when Explorer restarts, which IsWindow notices.
+    /// </summary>
     public static IntPtr ExplorerTray()
+    {
+        var cached = _explorerTray;
+        if (cached != IntPtr.Zero && IsWindow(cached)) return cached;
+        return _explorerTray = FindExplorerTray();
+    }
+
+    static IntPtr FindExplorerTray()
     {
         var h = IntPtr.Zero;
         while ((h = FindWindowEx(IntPtr.Zero, h, "Shell_TrayWnd", null)) != IntPtr.Zero)
