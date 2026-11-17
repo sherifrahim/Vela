@@ -21,6 +21,17 @@ public sealed class TrayIcon
     /// <summary>Set for stand-ins: apps that registered their icon with Explorer only (they never re-send it).</summary>
     public string? ExePath { get; init; }
     public bool IsStandIn => ExePath != null;
+    /// <summary>Apps that talk to the tray themselves can show their own right-click menu (not Windows' built-ins).</summary>
+    public bool HasOwnMenu
+    {
+        get
+        {
+            if (IsStandIn || CallbackMessage == 0 || !TrayHost.IsWindow(Hwnd)) return false;
+            TrayHost.GetWindowThreadProcessId(Hwnd, out uint pid);
+            try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); return !p.ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+    }
     internal string Key => Guid != Guid.Empty ? Guid.ToString() : $"{Hwnd}:{Id}";
 
     const uint WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_RBUTTONDOWN = 0x204, WM_RBUTTONUP = 0x205,

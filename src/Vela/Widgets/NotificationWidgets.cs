@@ -202,7 +202,15 @@ public sealed class TrayWidget : WidgetBase
         if (CardOpen) FlyoutWindow.Navigate(BuildCard());
     }
 
-    protected override double CardWidth => 300;
+    /// <summary>"Windows Security - Actions recommended." → "Windows Security"; "Speakers: 27%" → "Speakers".</summary>
+    static string ShortName(TrayIcon i)
+    {
+        var t = (i.Tip ?? "").Split((char)10)[0].Trim();
+        foreach (var sep in new[] { " - ", ": ", " – ", " (" }) { int k = t.IndexOf(sep, StringComparison.Ordinal); if (k > 0) t = t[..k]; }
+        return t.Length > 0 ? t : "App";
+    }
+
+    protected override double CardWidth => 300; // 4 columns with names
     protected override UIElement BuildCard()
     {
         var icons = Live ? Svc.Tray.Icons.ToList() : new List<TrayIcon>();
@@ -210,17 +218,32 @@ public sealed class TrayWidget : WidgetBase
         foreach (var icon in icons)
         {
             var i = icon;
-            var img = new Image { Source = i.Image, Width = 20, Height = 20 };
+            var img = new Image { Source = i.Image, Width = 22, Height = 22 };
             RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-            var cell = new Border { Height = 44, CornerRadius = new CornerRadius(10), Child = img, Background = Brushes.Transparent, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = string.IsNullOrWhiteSpace(i.Tip) ? null : i.Tip };
+            // The app's name under its icon (first line of its tooltip), so icons are recognisable at a glance.
+            var name = Text(ShortName(i), 9.5, FontWeights.SemiBold, "Text.Secondary").Center();
+            name.MaxWidth = 54;
+            name.Margin = new Thickness(0, 4, 0, 0);
+            var cell = new Border { Height = 58, CornerRadius = new CornerRadius(10), Padding = new Thickness(2, 7, 2, 4), Child = V(img, name), Background = Brushes.Transparent, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = string.IsNullOrWhiteSpace(i.Tip) ? null : i.Tip };
             cell.MouseEnter += (_, _) => cell.Bg("Fill.Control");
             cell.MouseLeave += (_, _) => cell.Background = Brushes.Transparent;
             // Left: a click per press (a second press within the double-click time sends the double-click), like the Windows
             // tray. The card stays open; it closes by itself when the app brings up its window or menu.
             cell.MouseLeftButtonDown += (_, e) => { e.Handled = true; i.Click(right: false, twice: e.ClickCount >= 2); };
-            cell.MouseRightButtonUp += (_, e) => { e.Handled = true; i.Click(right: true); };
+            cell.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                if (i.HasOwnMenu) { i.Click(right: true); return; }
+                // Windows' own icons and stand-ins can't show their app's menu: offer what they can do instead.
+                var menu = new ContextMenu();
+                menu.Items.Add(Item(i.IsStandIn ? $"Open {ShortName(i)}" : "Open settings", () => i.Click(right: false)));
+                cell.ContextMenu = menu;
+                menu.PlacementTarget = cell;
+                menu.IsOpen = true;
+            };
             grid.Children.Add(cell);
         }
+        grid.Columns = 4;
         var msg = Live ? "No background apps right now." : IsPreview ? "Background apps appear here." : "Tray icons are switched off (Settings → Dock → Background apps).";
         var none = Text(msg, 12.5, null, "Text.Secondary");
         none.TextWrapping = TextWrapping.Wrap;

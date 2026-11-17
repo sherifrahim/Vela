@@ -97,6 +97,8 @@ warnings.
   "TaskbarCreated" (confirmed with VELA_DEBUG_TRAY=1 + a direct post), so the tray also shows **stand-ins** from
   HKCU "Control Panel/NotifyIconSettings" (running exe + icon snapshot): left-click relaunches the app (brings its
   window), no menu. `Vela.exe --tray-dump` logs every icon. Owner verified left-click opens apps.
+- Tray card: app names under icons (4 columns); right-click shows the app's own menu (owner verified with
+  Windhawk / LG Switch), and a small Vela menu (Open / Open settings) for built-ins and stand-ins.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category
