@@ -106,6 +106,11 @@ warnings.
   Gallery (Unsplash access key; click a photo → SystemParametersInfo wallpaper; photographer credit + download ping).
   Temperature: this PC exposes no thermal zones to normal users (perf counters empty, MSAcpi unsupported) — needs a
   driver, left out. Do Not Disturb: no public toggle API. Now 99 of 109.
+- 2026-11-18: GitHub still listed Acadbek ("asad", author of the README commits this repo started from) from a stale
+  contributor cache plus orphaned commits; a default-branch switch didn't refresh it. With the owner's go-ahead the
+  repo was deleted and recreated (0 stars/forks/issues to lose), main + tags v0.2.0–v0.5.1 re-pushed, all 5 releases
+  re-published from a local backup (v0.5.1 latest). Contributors now: sherifrahim (+ claude co-author). The 31 local
+  legacy tags (v0.1.x / v1.x) that held his commits were deleted; never push tags outside v0.2.0+.
 
 **Next up**
 1. Picker: structure already matches `widgets-preview.webp`; only polish left (outlined close button, colour category
