@@ -10,7 +10,7 @@ namespace Vela.Theming;
 
 /// <summary>
 /// Real Liquid Glass: a GPU pixel shader that bends what is behind the dock like a thick lens. The flat middle stays
-/// clear (with a soft blur and a colour lift); towards the rounded edge the image is pulled inwards and stretched,
+/// frosted (blurred first by a WPF BlurEffect); towards the rounded edge the image is pulled inwards by Snell's law,
 /// red and blue split slightly (dispersion), and a light-catching rim runs along the edge facing the light.
 ///
 /// The HLSL below is compiled once at startup with Windows' own d3dcompiler_47.dll (no tools or packages) into a
@@ -19,12 +19,18 @@ namespace Vela.Theming;
 /// </summary>
 public static class LiquidGlass
 {
+    // The lens profile, the specular rim and the constants (bezel 25 % of the height up to 20 px, pull up to 80 % of
+    // the height / 60 px, ±10 % chromatic split, saturation 1.8, 5 % veil, 2.5 % grain, light from the top) follow
+    // WacOS's real-glass renderer (src/shell/backdrop.cpp: SnellAt, SpecFor, DrawPiece) as published under the MIT
+    // License at commit 2beced5 (Copyright (c) 2026 renzyxx; notice in THIRD_PARTY_NOTICES.md), which in turn
+    // measured them on macOS 26. Rewritten as a single pixel shader.
     const string Hlsl = """
         sampler2D input : register(s0);
-        float4 geo  : register(c0);  // x,y: size in px   z: corner radius px   w: rim (lens) width px
-        float4 lens : register(c1);  // x: refraction px  y: blur px  z: saturation  w: dispersion px
-        float4 lite : register(c2);  // x,y: light direction  z: specular  w: edge glow
-        float4 tint : register(c3);  // rgb: tint colour  a: tint amount
+        float4 geo  : register(c0);  // x,y: size px   z: corner radius px   w: bezel (lens band) px
+        float4 lens : register(c1);  // x: max pull px   y: chromatic split (0.1)   z: saturation   w: white veil
+        float4 lite : register(c2);  // x,y: light direction   z: rim gain   w: rim band px
+        float4 tint : register(c3);  // rgb: tint colour   a: tint amount
+        float4 more : register(c4);  // x: px per DIP   y: grain amount
 
         float sdBox(float2 p, float2 b, float r)
         {
@@ -32,54 +38,62 @@ public static class LiquidGlass
             return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
         }
 
-        float3 tap(float2 uv) { return tex2D(input, uv).rgb; }
+        // How far the image under the bezel moves (0..1), by Snell's law: the bezel is a convex squircle
+        // h(t) = (1 - (1 - t)^4)^(1/4) (t = 0 at the rim, 1 where the flat middle starts), glass n = 1.5.
+        float snell(float t)
+        {
+            float x = max(t, 0.0001);
+            float u = 1.0 - x;
+            float u3 = u * u * u;
+            float slope = u3 / pow(max(0.000001, 1.0 - u3 * u), 0.75) * 2.5;
+            float th = atan(slope);
+            float tr = asin(sin(th) / 1.5);
+            return tan(th - tr) / 1.1156;                                    // normalised: 1 right at the rim
+        }
 
         float4 main(float2 uv : TEXCOORD) : COLOR
         {
             float2 size = geo.xy;
             float2 hs = size * 0.5;
             float2 p = uv * size - hs;
-            float d = sdBox(p, hs, geo.z);                                  // < 0 inside the shape
+            float d = sdBox(p, hs, geo.z);                                   // < 0 inside the shape
+            float a = saturate(0.5 - d);                                     // anti-aliased edge
+            if (a <= 0.0) return float4(0, 0, 0, 0);
 
-            // Outward surface normal from the distance field.
             float2 n = float2(sdBox(p + float2(1, 0), hs, geo.z) - sdBox(p - float2(1, 0), hs, geo.z),
                               sdBox(p + float2(0, 1), hs, geo.z) - sdBox(p - float2(0, 1), hs, geo.z));
-            n = n / max(length(n), 0.0001);
+            n = n / max(length(n), 0.0001);                                  // outward normal
 
-            // Lens profile: 0 across the flat middle, rising smoothly to 1 at the very edge.
-            float t = saturate(1.0 + d / geo.w);
-            float bend = t * t * (3.0 - 2.0 * t);
-            bend = bend * bend;
+            // Refraction: under the bezel each point reads the (already frosted) scene further in; red a bit
+            // further and blue a bit less, so a faint colour fringe shows only where the glass bends.
+            float t = saturate(-d / geo.w);
+            float2 pull = n * (lens.x * (t < 1.0 ? snell(t) : 0.0)) / size;
+            float3 col;
+            col.r = tex2D(input, uv - pull * (1.0 + lens.y)).r;
+            col.g = tex2D(input, uv - pull).g;
+            col.b = tex2D(input, uv - pull * (1.0 - lens.y)).b;
 
-            float2 px = 1.0 / size;
-            float2 c = uv - n * bend * lens.x * px;                        // refraction: pull the image in from the rim
-
-            // Soft 9-tap blur (frosted body of the glass).
-            float b = lens.y;
-            float3 col = tap(c) * 0.2;
-            col += (tap(c + float2(b, 0) * px) + tap(c - float2(b, 0) * px) + tap(c + float2(0, b) * px) + tap(c - float2(0, b) * px)) * 0.125;
-            col += (tap(c + float2(b, b) * px * 0.7) + tap(c - float2(b, b) * px * 0.7) + tap(c + float2(b, -b) * px * 0.7) + tap(c - float2(b, -b) * px * 0.7)) * 0.075;
-
-            // Dispersion: red and blue bend a little differently near the rim.
-            float2 dsp = n * bend * lens.w * px;
-            col.r = lerp(col.r, tex2D(input, c + dsp).r, bend);
-            col.b = lerp(col.b, tex2D(input, c - dsp).b, bend);
-
-            // Vibrancy and tint.
+            // Vibrancy ("saturate(180%)"), tint, and the faint white veil inside the glass.
             float l = dot(col, float3(0.2126, 0.7152, 0.0722));
-            col = lerp(float3(l, l, l), col, lens.z);
+            col = max(lerp(float3(l, l, l), col, lens.z), 0.0);
             col = lerp(col, tint.rgb, tint.a);
+            col += (1.0 - col) * lens.w;
 
-            // Light: a thin bright band on the edge facing the light, a dimmer bounce opposite, a soft glow all round.
-            float2 L = normalize(lite.xy);
-            float band = pow(t, 7.0);
-            float facing = saturate(dot(n, -L));
-            float back = saturate(dot(n, L)) * 0.4;
-            col += (facing + back) * band * lite.z;
-            col += pow(t, 3.0) * lite.w;
+            // Grain hides the banding a heavy blur leaves behind.
+            float g = frac(sin(dot(floor(uv * size), float2(12.9898, 78.233))) * 43758.5453) - 0.5;
+            col += g * more.y;
 
-            float a = saturate(0.5 - d);                                    // 1 px anti-aliased edge
-            return float4(col * a, a);
+            // Specular rim: a crisp wire right on the edge plus a soft glow a few px in; brightest where the edge
+            // faces the light (top), a little on the opposite edge, almost nothing on the sides.
+            float din = max(0.0, -d);
+            float soft = saturate(1.0 - din / lite.w);
+            float edge = 0.8 * exp(-din / (0.55 * more.x)) + 0.16 * soft * soft * soft;
+            float an = dot(n, normalize(lite.xy));
+            float ang = 0.04 + 0.85 * pow(saturate(an), 2.0) + 1.0 * pow(saturate(-an), 2.0);
+            float s = din > lite.w ? 0.0 : saturate(edge * ang * lite.z);
+            col = col + (1.0 - col) * s;
+
+            return float4(saturate(col) * a, a);
         }
         """;
 
@@ -155,19 +169,22 @@ public sealed class LiquidGlassEffect : ShaderEffect
     public static readonly DependencyProperty LensProperty = Const(nameof(Lens), 1);
     public static readonly DependencyProperty LightProperty = Const(nameof(Light), 2);
     public static readonly DependencyProperty TintProperty = Const(nameof(Tint), 3);
+    public static readonly DependencyProperty MoreProperty = Const(nameof(More), 4);
 
     static DependencyProperty Const(string name, int register) =>
         DependencyProperty.Register(name, typeof(Point4D), typeof(LiquidGlassEffect), new UIPropertyMetadata(new Point4D(), PixelShaderConstantCallback(register)));
 
     public Brush Input { get => (Brush)GetValue(InputProperty); set => SetValue(InputProperty, value); }
-    /// <summary>Width, height, corner radius, lens (rim) width — physical px.</summary>
+    /// <summary>Width, height, corner radius, bezel (lens band) width — physical px.</summary>
     public Point4D Geometry { get => (Point4D)GetValue(GeometryProperty); set => SetValue(GeometryProperty, value); }
-    /// <summary>Refraction px, blur px, saturation, dispersion px.</summary>
+    /// <summary>Max pull px, chromatic split (0.1 = ±10 %), saturation, white veil.</summary>
     public Point4D Lens { get => (Point4D)GetValue(LensProperty); set => SetValue(LensProperty, value); }
-    /// <summary>Light direction (x, y), specular strength, edge glow.</summary>
+    /// <summary>Light direction (x, y), rim gain, rim band px.</summary>
     public Point4D Light { get => (Point4D)GetValue(LightProperty); set => SetValue(LightProperty, value); }
     /// <summary>Tint r, g, b (0–1) and amount.</summary>
     public Point4D Tint { get => (Point4D)GetValue(TintProperty); set => SetValue(TintProperty, value); }
+    /// <summary>Physical px per DIP, grain amount.</summary>
+    public Point4D More { get => (Point4D)GetValue(MoreProperty); set => SetValue(MoreProperty, value); }
 
     public LiquidGlassEffect()
     {
@@ -177,5 +194,6 @@ public sealed class LiquidGlassEffect : ShaderEffect
         UpdateShaderValue(LensProperty);
         UpdateShaderValue(LightProperty);
         UpdateShaderValue(TintProperty);
+        UpdateShaderValue(MoreProperty);
     }
 }

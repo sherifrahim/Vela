@@ -4,11 +4,50 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-24 — Claude (Opus 5.5) — session 8: salvage from OpenTaskbar and WacOS
+
+Owner: salvage what's possible from OpenTaskbar (updated) and WacOS. Licences checked first: OpenTaskbar is MIT.
+WacOS today is "source-available, no reuse in any project" — but commit `2beced5` (2026-11-20) was published under
+MIT, so only that snapshot is used (see AGENTS.md → Third-party code, THIRD_PARTY_NOTICES.md).
+
+**Changed (committed)**
+- Liquid Glass lens recalibrated to WacOS's macOS 26 measurements (`Theming/LiquidGlass.cs`, `DockWindow.ShowLens`):
+  Snell's-law squircle bezel (n = 1.5; band 25 % of height ≤ 20 px, pull 80 % ≤ 60 px), ±10 % chromatic split,
+  saturation 1.8, 5 % veil, 2.5 % grain, thin top-lit specular wire. Frost = BlurEffect σ 0.6–11.6 DIP (Blur strength).
+- **Temperature** widget (`temperature`): GPU sensor via WDDM `D3DKMTQueryAdapterInfo` (NVML fallback), no driver
+  (`Services/GpuThermal.cs`, `GpuMonitor.TempC`). Reads 55 °C on the owner's PC (test `HardwareTests`).
+- **Cursor Usage** widget (`cursor`): browser PKCE sign-in, tokens in Secrets, `GetCurrentPeriodUsage`/`GetPlanInfo`
+  (`Connectors/CursorConnector.cs`). Settings shows "Sign out" for browser sign-ins (`MetricConnector.CanSignOut`).
+  Endpoints answer (404 poll / 401 usage without a session); **never run with a real Cursor account**.
+- **Game Mode** (`Services/GameMode.cs`, Settings toggle, default on): engine window classes, store folders, exclusive
+  D3D fullscreen, or `%LOCALAPPDATA%\Vela\games.txt`. While on: lens/captures off (live blur), below-normal priority +
+  EcoQoS; off ~4 s after the game's windows are gone. Verified with a test entry (log + BelowNormal priority).
+- Window previews: Aero Peek after 500 ms on a card (honours EnableAeroPeek), middle-click closes the window; Vela's
+  glass windows, backdrops and the preview are excluded from peek; cleanup ends any peek.
+
+**Looked at, not taken:** OpenTaskbar's wireless peripheral batteries (no Logitech/Razer/SteelSeries device on this PC),
+Antigravity/Gemini usage (needs the Gemini CLI sign-in; not installed), WacOS screen-capture glass (it hides the shell
+from every screenshot/screen share via WDA_EXCLUDEFROMCAPTURE; Vela's per-window capture doesn't).
+
+**Verified:** build 0/0, tests 28/28, dock restarted on both displays with no ERROR lines, catalogue render shows both
+new widgets, `--quit` → "Vela stopped cleanly".
+
+**Next up**
+1. Composition glass for `Views/BackdropWindow.cs`: WacOS (`2beced5`, `src/shell/backdrop.cpp` MakeFrost/Apply) draws
+   frost as Windows.UI.Composition `HostBackdropBrush` → GaussianBlur σ16 → Saturation 1.65, clipped by an
+   anti-aliased rounded geometry (any radius). Needs a DispatcherQueue + `ICompositorDesktopInterop` in C#.
+2. OpenTaskbar's live drag reorder with a sliding neighbour gap (`Views/Windows/MainWindow.DragDrop.cs`, #130) for
+   `Views/DockRow.cs`.
+3. Per-app media volume (OpenTaskbar `MediaWidget`: AUMID → WASAPI session) for Now Playing.
+4. Tune the lens by eye with the owner over colourful content.
+
+---
+
 ## 2026-11-19 — Claude (Opus 5.5) — session 7: real Liquid Glass (refraction, live)
 
 Owner: "i need that og liquid glass or blur, achieve it at any cost."
 
-**Built (uncommitted)**
+**Built (committed in 3696164)**
 - `Theming/LiquidGlass.cs`: HLSL pixel shader compiled at startup with Windows' own `d3dcompiler_47.dll` (ps_3_0,
   ~2.3 KB) + `LiquidGlassEffect` (WPF `ShaderEffect`). Rounded-box SDF → surface normal → lens profile: the flat
   middle stays clear, the rim pulls the image inwards (refraction), splits red/blue (dispersion), and catches light

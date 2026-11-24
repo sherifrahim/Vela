@@ -53,6 +53,7 @@ public static class WidgetRegistry
         new("topram", "Top RAM", "System", () => new TopProcessesWidget(false)),
         new("cpu", "CPU", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Cpu)),
         new("ram", "RAM", "System", () => new SingleStatWidget(SingleStatWidget.Stat.Ram)),
+        new("temperature", "Temperature", "System", () => new TemperatureWidget()),
         new("network", "Network", "System", () => new NetworkWidget()),
         new("battery", "Battery", "System", () => new BatteryWidget()),
         new("battery.dots", "Battery Dots", "System", () => new BatteryDotsWidget()),
@@ -97,6 +98,7 @@ public static class WidgetRegistry
         new("deepseek", "DeepSeek Balance", "AI", () => new MetricWidget("deepseek"), "deepseek"),
         new("glm", "GLM Usage", "AI", () => new MetricWidget("glm"), "glm"),
         new("opencode", "OpenCode Usage", "AI", () => new MetricWidget("opencode", chart: true), "opencode"),
+        new("cursor", "Cursor Usage", "AI", () => new MetricWidget("cursor"), "cursor"),
         new("ailimits", "AI Limits", "AI", () => new AiLimitsWidget()),
 
         // Finance / Stocks

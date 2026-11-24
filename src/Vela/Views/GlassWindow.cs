@@ -95,6 +95,8 @@ public class GlassWindow : Window
         DwmSetWindowAttribute(Hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref noRound, sizeof(int));
         int noBorder = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE
         DwmSetWindowAttribute(Hwnd, DWMWA_BORDER_COLOR, ref noBorder, sizeof(int));
+        int keep = 1; // stays on screen while Windows peeks at another window (Aero Peek)
+        DwmSetWindowAttribute(Hwnd, DWMWA_EXCLUDED_FROM_PEEK, ref keep, sizeof(int));
         int dark = ThemeManager.Current.IsLight ? 0 : 1;
         DwmSetWindowAttribute(Hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
 

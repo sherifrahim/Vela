@@ -41,6 +41,8 @@ public abstract class MetricConnector : PollingConnector
     public virtual bool NeedsSignIn => false;
     public virtual string SignInLabel => "Sign in";
     public virtual Task SignInAsync() => Task.CompletedTask;
+    /// <summary>Signed in through the browser (no key to show): Settings offers "Sign out".</summary>
+    public virtual bool CanSignOut => false;
 
     /// <summary>Forget the key (and anything derived from it, e.g. a refresh token).</summary>
     public virtual void Disconnect() { if (SecretName != null) Secrets.Set(SecretName, null); }

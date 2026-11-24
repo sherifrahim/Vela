@@ -120,7 +120,7 @@ public sealed class WindowPreview : Window
         MouseEnter += (_, _) => HideTimer.Stop();
         MouseLeave += (_, _) => { HideTimer.Stop(); HideTimer.Start(); };
         SizeChanged += (_, _) => { Place(); PlaceThumbnails(); };
-        Closed += (_, _) => ReleaseThumbnails();
+        Closed += (_, _) => { EndPeek(false); ReleaseThumbnails(); };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -134,6 +134,8 @@ public sealed class WindowPreview : Window
             return IntPtr.Zero;
         });
         SetExStyle(_hwnd, GetExStyle(_hwnd) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+        int keep = 1; // the preview stays visible while it peeks at a window
+        DwmSetWindowAttribute(_hwnd, DWMWA_EXCLUDED_FROM_PEEK, ref keep, sizeof(int));
         int round = 2; // DWMWCP_ROUND
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
         int dark = Theming.ThemeManager.Current.IsLight ? 0 : 1;
@@ -176,17 +178,60 @@ public sealed class WindowPreview : Window
         _cards.Width = columns * (CardW + Gap);
     }
 
+    // ---------------- Aero Peek while the pointer rests on a card (ported from OpenTaskbar, MIT) ----------------
+
+    static readonly DispatcherTimer PeekTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    static IntPtr _peekCandidate, _peeked;
+    static long _peekEndedAt;
+
+    void SchedulePeek(IntPtr target)
+    {
+        PeekTimer.Stop();
+        _peekCandidate = target;
+        // Moving straight from one card to the next keeps peeking without the delay.
+        if (_peekEndedAt != 0 && Environment.TickCount64 - _peekEndedAt < 300) { Peek(target); return; }
+        PeekTimer.Tick -= OnPeekTimer;
+        PeekTimer.Tick += OnPeekTimer;
+        PeekTimer.Start();
+    }
+
+    void OnPeekTimer(object? s, EventArgs e)
+    {
+        PeekTimer.Stop();
+        if (_peekCandidate != IntPtr.Zero && IsVisible) Peek(_peekCandidate);
+    }
+
+    void Peek(IntPtr target)
+    {
+        if (!IsWindow(target) || _peeked == target) return;
+        WinActions.PeekWindow(true, target, _hwnd);
+        _peeked = target;
+    }
+
+    static void EndPeek(bool remember)
+    {
+        PeekTimer.Stop();
+        _peekCandidate = IntPtr.Zero;
+        if (_peeked == IntPtr.Zero) { if (!remember) _peekEndedAt = 0; return; }
+        var was = _peeked;
+        _peeked = IntPtr.Zero;
+        _peekEndedAt = remember ? Environment.TickCount64 : 0;
+        WinActions.PeekWindow(false, was, IntPtr.Zero);
+    }
+
     FrameworkElement Card(AppWindow w, ImageSource? icon)
     {
-        var close = CircleButton(UI.Glyphs.Close, () =>
+        void CloseWindow()
         {
+            EndPeek(false);
             WindowTracker.Close(w.Hwnd);
             Dispatcher.BeginInvoke(() =>
             {
                 var rest = _windows.Where(x => x.Hwnd != w.Hwnd && IsWindow(x.Hwnd)).ToList();
                 if (rest.Count == 0) Close(); else { _windows.Clear(); Fill(Anchor!, rest, icon); }
             }, DispatcherPriority.Background);
-        }, 22, "Transparent", "Text.Secondary", 8).Tip("Close window");
+        }
+        var close = CircleButton(UI.Glyphs.Close, CloseWindow, 22, "Transparent", "Text.Secondary", 8).Tip("Close window");
         var img = new Image { Width = 16, Height = 16, Source = icon, Margin = new Thickness(0, 0, 7, 0) };
         var title = Text(w.Title, 11.5, FontWeights.SemiBold);
         var header = Columns("auto,*,auto", img, title, close);
@@ -199,15 +244,18 @@ public sealed class WindowPreview : Window
             Margin = new Thickness(0, 0, Gap, Gap), Cursor = Cursors.Hand, Background = Brushes.Transparent,
             Child = V(header, thumbSlot), Tag = w.Hwnd,
         };
-        card.MouseEnter += (_, _) => { card.Bg("Tile.Hover"); thumbSlot.SetResourceReference(Border.BorderBrushProperty, "Accent"); };
-        card.MouseLeave += (_, _) => { card.Background = Brushes.Transparent; thumbSlot.BorderBrush = Brushes.Transparent; };
+        card.MouseEnter += (_, _) => { card.Bg("Tile.Hover"); thumbSlot.SetResourceReference(Border.BorderBrushProperty, "Accent"); SchedulePeek(w.Hwnd); };
+        card.MouseLeave += (_, _) => { card.Background = Brushes.Transparent; thumbSlot.BorderBrush = Brushes.Transparent; EndPeek(true); };
         card.MouseLeftButtonUp += (_, e) =>
         {
             if (close.IsMouseOver) return;
             e.Handled = true;
+            EndPeek(false);
             CloseAll();
             WindowTracker.Activate(w.Hwnd);
         };
+        // Middle-click closes the window, like the taskbar's thumbnails.
+        card.MouseUp += (_, e) => { if (e.ChangedButton == MouseButton.Middle) { e.Handled = true; CloseWindow(); } };
         return card;
     }
 

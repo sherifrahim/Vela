@@ -125,6 +125,7 @@ public partial class App : Application
         ThemeManager.Apply();
         WallpaperGlass.Reload();
         Svc.ScreenTime.Start();
+        Vela.Services.GameMode.Start();
         Svc.Ticker.Start();
 
         _dock = new DockWindow();
@@ -171,6 +172,7 @@ public partial class App : Application
         }
         try
         {
+            Stage("end any window peek", () => WinActions.PeekWindow(false, IntPtr.Zero, IntPtr.Zero));
             Stage("flush settings and data", Svc.FlushAll);
             Stage("dock teardown", () => OnUi(() => _dock?.Teardown()));
         }

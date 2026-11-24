@@ -112,7 +112,10 @@ reference/lumabar/       original app's public README + screenshots (reference o
   window still grabs focus. Create them outside render/layout callbacks (defer with `Dispatcher.BeginInvoke`).
 - **Adaptive theme:** each dock merges a light or dark `ThemeManager.Variant` into its own `Resources`; anything
   you open from a dock (cards, previews) should adopt `DockWindow.For(anchor).AdaptiveResources`.
-- **Third-party code:** `Shell/JumpLists.cs` is ported from OpenTaskbar (MIT) — keep its header and
+- **Third-party code:** OpenTaskbar (MIT) is ported in `Shell/JumpLists.cs`, `Services/GpuThermal.cs`,
+  `Connectors/CursorConnector.cs` and parts of `Views/WindowPreview.cs`. WacOS is used **only at commit `2beced5`**, its
+  one MIT-licensed revision (`Theming/LiquidGlass.cs` constants, `Services/GameMode.cs`); every later WacOS revision is
+  GPL or "source-available, no reuse", so never copy from current WacOS. Keep the file headers and
   `THIRD_PARTY_NOTICES.md`.
 - **Several displays:** `DockWindow.All` holds one dock per display; only `DockWindow.Instance` (primary) owns
   the taskbar, shell hook and windows. Use `DockWindow.For(element)` to reach the dock a widget lives in.

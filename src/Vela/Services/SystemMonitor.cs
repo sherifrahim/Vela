@@ -141,6 +141,9 @@ public sealed class GpuMonitor : IDisposable
 
     public double Load { get; private set; } = -1;     // %, -1 = unknown
     public double VramGb { get; private set; } = -1;
+    /// <summary>Hottest GPU in °C (WDDM adapter data, NVML fallback), -1 when the PC doesn't expose it.</summary>
+    public double TempC { get; private set; } = -1;
+    public Queue<double> TempHistory { get; } = new();
     public Queue<double> History { get; } = new();
 
     public event Action? Updated
@@ -177,6 +180,7 @@ public sealed class GpuMonitor : IDisposable
         double vram = Sum(_vram, PDH_FMT_DOUBLE);
         if (load >= 0) { Load = Math.Clamp(load, 0, 100); History.Enqueue(Load); while (History.Count > 40) History.Dequeue(); }
         if (vram >= 0) VramGb = vram / 1073741824.0;
+        if (GpuThermal.Hottest() is { } t) { TempC = t; TempHistory.Enqueue(t); while (TempHistory.Count > 40) TempHistory.Dequeue(); }
         _updated?.Invoke();
     }
 

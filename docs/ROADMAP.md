@@ -61,9 +61,9 @@ Todo, roughly by value:
 - [ ] Connect/disconnect paired Bluetooth audio (no public API; investigate KS reconnect like ToothTray)
 - [ ] Do Not Disturb toggle (Focus Assist: `WNF`/quiet hours APIs — research), Keyboard (osk.exe), Language (keyboard layout switch)
 - [x] Top CPU / Top RAM tiles (shared sampler)
-- [ ] Temperature (WMI MSAcpi_ThermalZoneTemperature needs admin → research LibreHardwareMonitor-style alternatives)
+- [x] Temperature: GPU sensor via WDDM adapter data, NVML fallback (2026-11-24). CPU temperature still needs a kernel driver
 - [x] Flip clock, analog minimal, world clocks, weather status, hourly, today & forecast, Top CPU / Top RAM
-- [~] Segment clock, clock & weather, 7 days, battery core / gauge, stock watchlist done; temperature, day timeline open
+- [~] Segment clock, clock & weather, 7 days, battery core / gauge, stock watchlist done; day timeline open
 - [ ] Now Playing compact + bar variants (per-app mixer done: Speakers tile → "Output and apps")
 - [ ] Quick toggles: hotspot, airplane, energy saver, Ethernet status, user-selectable toggles
 - [x] Weather hourly / today & forecast / status / sunrise tiles
@@ -83,6 +83,10 @@ Todo, roughly by value:
 - [ ] App folders (2×2 mini-icon tile), recent-apps section, minimize-to-dock hint
 
 ## P2 — glass & animation
+- [x] Game Mode (2026-11-24): glass captures off + low priority while a game is in front (`Services/GameMode.cs`)
+- [x] Window previews: Aero Peek on hover, middle-click close (2026-11-24)
+- [ ] Composition frost for `BackdropWindow` (HostBackdropBrush + blur + saturation, rounded AA clip; see PROGRESS)
+- [ ] Live drag reorder with a sliding neighbour gap (OpenTaskbar #130)
 - [x] Live Liquid Glass (2026-11-19): ps_3_0 refraction shader over the wallpaper + Windows.Graphics.Capture of the windows
       behind the dock (`Theming/LiquidGlass.cs`, `Theming/WindowCapture.cs`). Still to do: same lens on cards/picker.
 - [ ] App launch bounce ✔ exists; add minimize-to-dock "genie"-style hint animation on the icon

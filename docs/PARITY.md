@@ -6,15 +6,15 @@ Checked 2026-11-17 against lumabar.xyz (home, /widgets, /docs, /changelog, /term
 no trial. Every widget and feature comes with the one license; there is no free/paid split. So "everything it
 charges for" = the whole app below.
 
-## Widgets: 99 of 109
+## Widgets: 101 of 109
 
 | Category (theirs) | Have | Missing |
 |---|---|---|
 | Clocks (11) | 11 | — |
 | Productivity (10) | 10 | — (Calendar shows Google/Outlook/iCloud events through private iCal links) |
-| System (23) | 21 | Temperature (no thermal data without a kernel driver on this PC), Do Not Disturb (no public API to toggle it) |
+| System (23) | 22 | Do Not Disturb (no public API to toggle it). Temperature shows the GPU sensor (WDDM); CPU temperature needs a kernel driver |
 | Media & Audio (6) | 6 | — |
-| AI (11) | 7 | Gemini (reads the Antigravity sign-in), Grok (SuperGrok has no public usage API), OpenCode Plan, Cursor (session lives in its SQLite store) |
+| AI (11) | 8 | Gemini (reads the Antigravity sign-in), Grok (SuperGrok has no public usage API), OpenCode Plan. Cursor added 2026-11-24 (browser sign-in) |
 | Finance (15) | 15 | — |
 | Analytics (4) | 3 | DataFast |
 | Developer (3) | 3 | — |

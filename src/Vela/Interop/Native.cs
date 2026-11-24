@@ -234,6 +234,7 @@ internal static class Native
 
     // ---------- dwmapi ----------
     public const int DWMWA_NCRENDERING_POLICY = 2;
+    public const int DWMWA_EXCLUDED_FROM_PEEK = 12;
     public const int DWMWA_CLOAKED = 14;
     public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;

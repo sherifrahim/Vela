@@ -135,6 +135,24 @@ public static class WinActions
         catch (Exception ex) { _peekBroken = true; Log.Warn("Desktop peek unavailable: " + ex.Message); }
     }
 
+    /// <summary>
+    /// Aero Peek at one window: everything else fades to glass outlines while the pointer rests on its preview
+    /// (the taskbar's own behaviour, honouring Windows' "Use Peek" setting). Undocumented DWM call, as ManagedShell
+    /// and OpenTaskbar use it; a no-op if unavailable.
+    /// </summary>
+    public static void PeekWindow(bool on, IntPtr target, IntPtr caller)
+    {
+        if (_peekBroken || (on && !PeekEnabled())) return;
+        try { DwmpActivateLivePreview(on ? 1 : 0, target, caller, 1 /*window*/, IntPtr.Zero); }
+        catch (Exception ex) { _peekBroken = true; Log.Warn("Window peek unavailable: " + ex.Message); }
+    }
+
+    static bool PeekEnabled()
+    {
+        using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+        return k?.GetValue("EnableAeroPeek") is not int v || v != 0;
+    }
+
     public static void TrimWorkingSet()
     {
         try { SetProcessWorkingSetSize(GetCurrentProcess(), new IntPtr(-1), new IntPtr(-1)); }

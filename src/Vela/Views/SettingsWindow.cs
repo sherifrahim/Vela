@@ -208,6 +208,7 @@ public sealed class SettingsWindow : GlassWindow
         Field("Open indicator", Wrap(new[] { ("dot", "Dot"), ("large", "Large dot"), ("line", "Line") }
             .Select(x => Segment(x.Item2, "indicator", s.OpenIndicator == x.Item1, () => { s.OpenIndicator = x.Item1; Settings.Save("pins"); }))),
             "The mark under apps that are open.");
+        Toggle("Game Mode", "While a game is in front, the glass stops capturing what's behind the dock and Vela runs at low priority until the game closes. Add games Vela misses to games.txt in Vela's data folder.", s.GameMode, v => { s.GameMode = v; Settings.Save("gamemode"); });
         Toggle("Liquid Glass refraction", "Liquid Glass style: the bar bends the wallpaper behind it like real glass (GPU). Falls back to live blur when a window is behind the dock.", s.LiquidRefraction, v => { s.LiquidRefraction = v; Settings.Save("glass"); });
         Toggle("Background apps (tray)", "Show tray icons in the Tray tile. Vela mirrors the Windows tray and passes everything on to it; turn off if Start or the tray ever misbehave.", s.TrayHost, v => { s.TrayHost = v; Settings.Save("pins"); });
         Toggle("App badges", "Unread counts from your notifications on dock icons (WhatsApp, Discord, Mail…). Windows asks once to allow notification access.", s.AppBadges, v => { s.AppBadges = v; Settings.Save("pins"); });
@@ -378,7 +379,8 @@ public sealed class SettingsWindow : GlassWindow
     {
         var status = Text(c.Status, 11.5, null, c.Error != null ? "Sys.Orange" : c.IsConnected ? "Sys.Green" : "Text.Secondary");
         var head = Columns("*,auto", V(Text(c.Name, 13.5, FontWeights.SemiBold), status.Margin(0, 2, 0, 0)),
-            c.Auth == ConnectorAuth.ApiKey && c.IsConnected
+            c is MetricConnector { CanSignOut: true } so ? Btn("Sign out", () => { so.Disconnect(); Rebuild(); })
+            : c.Auth == ConnectorAuth.ApiKey && c.IsConnected
                 ? Btn("Disconnect", () => { if (c is MetricConnector m) m.Disconnect(); else Secrets.Set(c.SecretName!, null); Rebuild(); })
                 : c.HelpUrl != null ? Btn(c.Auth == ConnectorAuth.LocalSignIn ? "Setup guide" : "Get a key", () => WindowTracker.OpenUri(c.HelpUrl)) : new Border());
         var desc = Text(c.Description, 11.5, null, "Text.Tertiary");

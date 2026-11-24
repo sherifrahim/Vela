@@ -70,6 +70,8 @@ public sealed class BackdropWindow : Window
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref noRound, sizeof(int));
         int none = unchecked((int)0xFFFFFFFE);
         DwmSetWindowAttribute(_hwnd, DWMWA_BORDER_COLOR, ref none, sizeof(int));
+        int keep = 1; // the glass stays under the dock during Aero Peek
+        DwmSetWindowAttribute(_hwnd, DWMWA_EXCLUDED_FROM_PEEK, ref keep, sizeof(int));
         ApplyMaterial();
     }
 

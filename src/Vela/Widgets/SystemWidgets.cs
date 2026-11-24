@@ -661,3 +661,57 @@ public sealed class SystemMonitorWidget : WidgetBase
             .Where(x => x.name != "Idle").OrderByDescending(x => x.cpu).ThenByDescending(x => x.mem).Take(6).ToList();
     }
 }
+
+/// <summary>GPU temperature (WDDM adapter data, no driver needed) with VRAM and load; the card charts it.</summary>
+public sealed class TemperatureWidget : WidgetBase
+{
+    RingGauge _ring = null!;
+    TextBlock _v = null!, _sub = null!;
+
+    protected override UIElement BuildContent()
+    {
+        var r = Rings.Make("°C", "Sys.Orange");
+        (_ring, _v) = (r.ring, r.value);
+        _sub = Text("", 9, FontWeights.SemiBold);
+        return H(r.host, V(Caption("Graphics"), _sub).Margin(8, 0, 2, 0));
+    }
+
+    protected override void OnAttach() => Svc.Gpu.Updated += Render;
+    protected override void OnDetach() => Svc.Gpu.Updated -= Render;
+
+    void Render()
+    {
+        var g = Svc.Gpu;
+        if (g.TempC < 0) { _v.Text = "—"; _ring.Value = 0; _sub.Text = "No sensor"; return; }
+        _v.Text = $"{g.TempC:0}";
+        _ring.Value = Math.Clamp(g.TempC / 100, 0, 1);
+        _sub.Text = g.Load >= 0 ? $"{g.Load:0}% load" : "";
+    }
+
+    static TextBlock Note(string s) { var t = Text(s, 11, null, "Text.Secondary"); t.TextWrapping = TextWrapping.Wrap; return t; }
+
+    protected override UIElement BuildCard()
+    {
+        var g = Svc.Gpu;
+        var value = Text(g.TempC < 0 ? "—" : $"{g.TempC:0} °C", 13, FontWeights.Bold);
+        var load = Text(g.Load < 0 ? "—" : $"{g.Load:0}%", 13, FontWeights.Bold);
+        var vram = Text(g.VramGb < 0 ? "—" : $"{g.VramGb:0.0} GB", 13, FontWeights.Bold);
+        var chart = new Sparkline("Sys.Orange") { Height = 50, Max = 100, Margin = new Thickness(0, 4, 0, 12) };
+        chart.SetValues(g.TempHistory);
+        void Live()
+        {
+            value.Text = g.TempC < 0 ? "—" : $"{g.TempC:0} °C";
+            load.Text = g.Load < 0 ? "—" : $"{g.Load:0}%";
+            vram.Text = g.VramGb < 0 ? "—" : $"{g.VramGb:0.0} GB";
+            chart.SetValues(g.TempHistory);
+        }
+        var root = V(Card.Header("Temperature"),
+            Columns("*,auto", Label("Graphics card"), value), chart,
+            Columns("*,auto", Label("Load"), load).Margin(0, 0, 0, 8),
+            Columns("*,auto", Label("Video memory"), vram).Margin(0, 0, 0, 8),
+            Note("Processor temperature needs a kernel driver on Windows, so Vela shows the GPU's own sensor."));
+        root.Loaded += (_, _) => g.Updated += Live;
+        root.Unloaded += (_, _) => g.Updated -= Live;
+        return root;
+    }
+}

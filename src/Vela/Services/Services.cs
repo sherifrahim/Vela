@@ -43,7 +43,7 @@ public static class Services
         new PolarConnector(), new LemonSqueezyConnector(), new PaddleConnector(), new GumroadConnector(), new ShopifyConnector(), new DodoConnector(),
         new DeepSeekConnector(), new PlausibleConnector(), new DubConnector(), new LinearConnector(), new SupabaseConnector(), new ResendConnector(),
         new YouTubeConnector(), new LeetCodeConnector(), new GitHubActivityConnector(), new GitHubOverviewConnector(), new FinnhubConnector(),
-        new GmailConnector(), new SearchConsoleConnector(), new GlmConnector(), new OpenCodeConnector(), new UnsplashConnector(),
+        new GmailConnector(), new SearchConsoleConnector(), new GlmConnector(), new OpenCodeConnector(), new CursorConnector(), new UnsplashConnector(),
         new CalendarConnector(),
     });
 

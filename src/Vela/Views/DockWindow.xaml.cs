@@ -81,6 +81,7 @@ public partial class DockWindow : GlassWindow
         WallpaperGlass.Changed += UpdateGlass;
         ScreenEvents.Changed += OnScreenMovedForLens;
         Svc.Windows.ForegroundChanged += OnScreenMovedForLens;
+        Vela.Services.GameMode.Changed += UpdateGlass;
         Bar.SizeChanged += (_, _) => UpdateGlass();
         WidgetBase.EditModeChanged += OnEditMode;
 
@@ -104,6 +105,7 @@ public partial class DockWindow : GlassWindow
             WallpaperGlass.Changed -= UpdateGlass;
             ScreenEvents.Changed -= OnScreenMovedForLens;
             Svc.Windows.ForegroundChanged -= OnScreenMovedForLens;
+            Vela.Services.GameMode.Changed -= UpdateGlass;
             _lensDebounce?.Stop();
             DropCaptures();
             if (IsPrimary) Application.Current.Shutdown();
@@ -411,7 +413,8 @@ public partial class DockWindow : GlassWindow
         if (Settings.Current.AdaptiveTheme) PokeAdaptive();                 // re-sample (light/dark) after any move / resize
         // Liquid Glass: refract what is behind the bar on the GPU: the wallpaper, plus a live capture of any window there.
         string why = !Settings.Current.LiquidRefraction ? "off in settings" : ThemeManager.Current.Id != "glass" ? "style is not Liquid Glass" : !ThemeManager.GlassOn ? "glass off"
-            : Hwnd == IntPtr.Zero || !Bar.IsLoaded ? "not ready" : _fullscreenHidden ? "fullscreen" : !LiquidGlass.Available ? "no shader" : "on";
+            : Hwnd == IntPtr.Zero || !Bar.IsLoaded ? "not ready" : _fullscreenHidden ? "fullscreen" : !LiquidGlass.Available ? "no shader"
+            : Vela.Services.GameMode.Active ? "game mode" : "on";
         var behind = why == "on" ? WindowsBehindBar() : new List<IntPtr>();
         if (why == "on" && behind.Count > 0 && !WindowCapture.Supported) why = "window behind the bar, no capture API";
         if (why == "on" && behind.Any(_noCapture.Contains)) why = "window behind the bar can't be captured";
@@ -619,7 +622,9 @@ public partial class DockWindow : GlassWindow
         if (lens.Width < 4 || lens.Height < 4) return;
         // What the lens bends is the scene behind the bar, blurred on the GPU first (frosted body). The scene canvas
         // overhangs the bar by the blur radius so the blur has real pixels at the edges instead of fading to black.
-        double blur = 3 + Math.Clamp(Settings.Current.GlassBlur, 0, 100) / 100 * 15;
+        // Frost: Gaussian sigma 0.6–11.6 DIP from Settings → Blur strength (WacOS / macOS 26 default ≈ 6 DIP); a WPF BlurEffect
+        // radius is about three sigmas.
+        double blur = 3 * (0.6 + Math.Clamp(Settings.Current.GlassBlur, 0, 100) / 100 * 11);
         _lensBleed = Math.Ceiling(blur + 2);
         double bleedPx = _lensBleed * dpi;
         // The whole width of the monitor at the bar's height: width changes (magnification, widgets) reuse the slice.
@@ -660,14 +665,17 @@ public partial class DockWindow : GlassWindow
             _lensFx ??= new LiquidGlassEffect();
             double w = Bar.ActualWidth * dpi, h = Bar.ActualHeight * dpi, radius = BarRadius * ThemeManager.SizeScale * dpi;
             bool light = ThemeManager.Current.IsLight || (Settings.Current.AdaptiveTheme && _adaptiveLight == true);
-            _lensFx.Geometry = new System.Windows.Media.Media3D.Point4D(w, h, radius, Math.Min(h * 0.38, 18 * dpi));
-            _lensFx.Lens = new System.Windows.Media.Media3D.Point4D(10 * dpi, 1 * dpi, 1.4, 1.2 * dpi);
-            _lensFx.Light = new System.Windows.Media.Media3D.Point4D(-0.45, -1, light ? 0.45 : 0.6, light ? 0.05 : 0.07);
+            double side = Math.Min(w, h);                                       // calibrated on macOS 26 (see LiquidGlass.cs)
+            double bezel = Math.Clamp(side * 0.25, 4 * dpi, 20 * dpi), pullMax = Math.Min(side * 0.8, 60 * dpi);
+            _lensFx.Geometry = new System.Windows.Media.Media3D.Point4D(w, h, radius, bezel);
+            _lensFx.Lens = new System.Windows.Media.Media3D.Point4D(pullMax, 0.10, 1.8, 0.05);
+            _lensFx.Light = new System.Windows.Media.Media3D.Point4D(0, -1, light ? 0.85 : 0.8, Math.Clamp(side * 0.08, 2 * dpi, 6 * dpi));
+            _lensFx.More = new System.Windows.Media.Media3D.Point4D(dpi, 0.025, 0, 0);
             _lensFx.Tint = light ? new System.Windows.Media.Media3D.Point4D(1, 1, 1, 0.22) : new System.Windows.Media.Media3D.Point4D(0.03, 0.04, 0.06, 0.24);
             Lens.Effect = _lensFx;
             Lens.Visibility = Visibility.Visible;
             // The lens is the glass now: the flat tint, sheen and rim drawn for the blur would only muddy it.
-            Tint.Opacity = 0.25;
+            Tint.Opacity = 0;
             Sheen.Visibility = Visibility.Collapsed;
             Rim.Visibility = Visibility.Collapsed;
             if (!_lensActive) Log.Info($"Liquid Glass lens on ({(IsPrimary ? "primary" : "secondary")} dock, {t.Result.PixelWidth}×{t.Result.PixelHeight} wallpaper strip)");
