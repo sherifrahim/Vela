@@ -34,7 +34,7 @@ Supabase, Resend, YouTube, LeetCode, GitHub Activity, Stock Watchlist (Finnhub).
 | Reference feature | Vela |
 |---|---|
 | Styles, sizes, top/bottom, full width, auto-hide, taskbar hiding | ✔ |
-| Live blur under the dock | ✔ (Acrylic); real Liquid Glass *refraction* ✘ |
+| Live blur under the dock | ✔ (Acrylic) + real Liquid Glass refraction (GPU shader over live window capture) |
 | Widget picker, edit mode, drag to reorder, lock dock | ✔ |
 | Apps: pins, previews, jump lists, end task, attention, open indicator (dot/large/line) | ✔ |
 | Win+1…0 open dock apps | ✘ (Explorer owns those keys) |

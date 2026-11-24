@@ -30,6 +30,7 @@ public sealed class AppSettings
     public bool LockDock { get; set; }                 // widgets, apps and the bar edge move only while the widget picker is open
     public string OpenIndicator { get; set; } = "dot"; // running-app mark under icons: dot | large | line (reference 1.2.20)
     public bool AppBadges { get; set; } = true;        // unread counts from Action Center on dock icons (reference app badges)
+    public bool LiquidRefraction { get; set; } = true; // Liquid Glass style: GPU refraction of the wallpaper (falls back to live blur)
     public bool TrayHost { get; set; } = true;         // tray icons via a second Shell_TrayWnd (runs only with a Tray tile); kill switch
     public bool AdminShellHotkey { get; set; } = true; // Alt+T opens PowerShell as administrator from anywhere
     public bool AppTiles { get; set; } = false;       // each app icon in its own tile; false (default) = loose icons on the glass, like the reference and macOS

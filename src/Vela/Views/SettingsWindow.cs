@@ -208,6 +208,7 @@ public sealed class SettingsWindow : GlassWindow
         Field("Open indicator", Wrap(new[] { ("dot", "Dot"), ("large", "Large dot"), ("line", "Line") }
             .Select(x => Segment(x.Item2, "indicator", s.OpenIndicator == x.Item1, () => { s.OpenIndicator = x.Item1; Settings.Save("pins"); }))),
             "The mark under apps that are open.");
+        Toggle("Liquid Glass refraction", "Liquid Glass style: the bar bends the wallpaper behind it like real glass (GPU). Falls back to live blur when a window is behind the dock.", s.LiquidRefraction, v => { s.LiquidRefraction = v; Settings.Save("glass"); });
         Toggle("Background apps (tray)", "Show tray icons in the Tray tile. Vela mirrors the Windows tray and passes everything on to it; turn off if Start or the tray ever misbehave.", s.TrayHost, v => { s.TrayHost = v; Settings.Save("pins"); });
         Toggle("App badges", "Unread counts from your notifications on dock icons (WhatsApp, Discord, Mail…). Windows asks once to allow notification access.", s.AppBadges, v => { s.AppBadges = v; Settings.Save("pins"); });
         Toggle("App tiles", "Each app sits in its own tile, like the widgets. Off: loose icons like the macOS dock.", s.AppTiles, v => { s.AppTiles = v; Settings.Save("pins"); });

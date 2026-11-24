@@ -79,6 +79,8 @@ public partial class DockWindow : GlassWindow
         ThemeManager.Changed += ApplyLook;
         Settings.Changed += OnSettingChanged;
         WallpaperGlass.Changed += UpdateGlass;
+        ScreenEvents.Changed += OnScreenMovedForLens;
+        Svc.Windows.ForegroundChanged += OnScreenMovedForLens;
         Bar.SizeChanged += (_, _) => UpdateGlass();
         WidgetBase.EditModeChanged += OnEditMode;
 
@@ -100,6 +102,10 @@ public partial class DockWindow : GlassWindow
             ThemeManager.Changed -= ApplyLook;
             Settings.Changed -= OnSettingChanged;
             WallpaperGlass.Changed -= UpdateGlass;
+            ScreenEvents.Changed -= OnScreenMovedForLens;
+            Svc.Windows.ForegroundChanged -= OnScreenMovedForLens;
+            _lensDebounce?.Stop();
+            DropCaptures();
             if (IsPrimary) Application.Current.Shutdown();
         };
         Bar.MouseLeftButtonDown += OnBarMouseDown;
@@ -403,6 +409,15 @@ public partial class DockWindow : GlassWindow
     void UpdateGlass()
     {
         if (Settings.Current.AdaptiveTheme) PokeAdaptive();                 // re-sample (light/dark) after any move / resize
+        // Liquid Glass: refract what is behind the bar on the GPU: the wallpaper, plus a live capture of any window there.
+        string why = !Settings.Current.LiquidRefraction ? "off in settings" : ThemeManager.Current.Id != "glass" ? "style is not Liquid Glass" : !ThemeManager.GlassOn ? "glass off"
+            : Hwnd == IntPtr.Zero || !Bar.IsLoaded ? "not ready" : _fullscreenHidden ? "fullscreen" : !LiquidGlass.Available ? "no shader" : "on";
+        var behind = why == "on" ? WindowsBehindBar() : new List<IntPtr>();
+        if (why == "on" && behind.Count > 0 && !WindowCapture.Supported) why = "window behind the bar, no capture API";
+        if (why == "on" && behind.Any(_noCapture.Contains)) why = "window behind the bar can't be captured";
+        if (why != _lensWhy) { _lensWhy = why; Log.Info($"Liquid Glass ({(IsPrimary ? "primary" : "secondary")}): {why}"); }
+        if (why == "on") { ShowLens(); SyncCaptures(behind); return; }
+        HideLens();
         if (LiveBlurOn) { Bar.Background = null; SyncBackdrop(); return; }
         _backdrop?.HideBackdrop();
         if (Settings.Current.AdaptiveTheme && _adaptiveBrush != null) { Bar.Background = _adaptiveBrush; return; }
@@ -419,6 +434,272 @@ public partial class DockWindow : GlassWindow
             Bar.Background = WallpaperGlass.BrushFor(new Rect(tl, br), new Rect(m.Left, m.Top, m.Width, m.Height));
         }
         catch (InvalidOperationException) { /* not yet connected to a presentation source */ }
+    }
+
+    // ------------------------------------------------------------------ Liquid Glass lens
+
+    LiquidGlassEffect? _lensFx;
+    System.Windows.Shapes.Rectangle? _lensWall; // the wallpaper strip, bottom layer of the scene the lens bends
+    double _lensBleed;                          // DIPs the scene overhangs the bar (blur radius + a little)
+    bool _lensActive;
+    int _lensRequest;
+    string? _lensWhy, _lensBlocker;
+    System.Windows.Threading.DispatcherTimer? _lensDebounce;
+
+    /// <summary>Liquid Glass style, refraction on (Settings), and a GPU that runs the shader.</summary>
+    bool LensWanted => Settings.Current.LiquidRefraction && ThemeManager.Current.Id == "glass" && ThemeManager.GlassOn
+                       && Hwnd != IntPtr.Zero && Bar.IsLoaded && !_fullscreenHidden && LiquidGlass.Available;
+
+    /// <summary>
+    /// Real windows behind the bar, top of the z-order first (at most 3; the dock reserves its strip, so usually none).
+    /// Click-through and always-on-top layered overlays (screen-split helpers, OSDs) are left out: they're mostly
+    /// transparent, and capturing them would hide the window that's really there.
+    /// </summary>
+    List<IntPtr> WindowsBehindBar()
+    {
+        var found = new List<IntPtr>();
+        RECT bar;
+        try
+        {
+            var tl = Bar.PointToScreen(new Point(0, 0));
+            var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
+            bar = new RECT { Left = (int)tl.X, Top = (int)tl.Y, Right = (int)br.X, Bottom = (int)br.Y };
+        }
+        catch (InvalidOperationException) { return found; }
+        uint own = (uint)Environment.ProcessId;
+        _noCapture.RemoveWhere(h => !IsWindow(h));
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h) || IsIconic(h)) return true;
+            GetWindowThreadProcessId(h, out uint pid);
+            if (pid == own) return true;
+            if (DwmGetWindowAttribute(h, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0) return true;
+            long ex = GetExStyle(h);
+            if ((ex & WS_EX_TOOLWINDOW) != 0 || (ex & 0x20 /*WS_EX_TRANSPARENT*/) != 0) return true;
+            if ((ex & 0x80000 /*WS_EX_LAYERED*/) != 0 && (ex & WS_EX_TOPMOST) != 0) return true;
+            if (GetClassNameOf(h) is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") return true;
+            // Visible frame (no invisible resize borders, which make maximized windows overlap by a few px).
+            if (DwmGetWindowAttribute(h, 9 /*DWMWA_EXTENDED_FRAME_BOUNDS*/, out RECT r, System.Runtime.InteropServices.Marshal.SizeOf<RECT>()) != 0 && !GetWindowRect(h, out r)) return true;
+            int ix = Math.Min(r.Right, bar.Right) - Math.Max(r.Left, bar.Left), iy = Math.Min(r.Bottom, bar.Bottom) - Math.Max(r.Top, bar.Top);
+            if (ix > 8 && iy > 4)
+            {
+                found.Add(h);
+                // A window that covers the whole bar hides everything below it.
+                if (r.Left <= bar.Left && r.Right >= bar.Right && r.Top <= bar.Top && r.Bottom >= bar.Bottom) return false;
+            }
+            return found.Count < 3;
+        }, IntPtr.Zero);
+        var who = string.Join(", ", found.Select(h =>
+        {
+            GetWindowThreadProcessId(h, out uint pid);
+            string proc = "";
+            try { using var p = Process.GetProcessById((int)pid); proc = p.ProcessName; } catch { }
+            return $"{GetClassNameOf(h)} ({proc})";
+        }));
+        if (who != _lensBlocker) { _lensBlocker = who; if (who.Length > 0) Log.Info($"Liquid Glass: behind the bar: {who}"); }
+        return found;
+    }
+
+    // ---------- live window capture under the lens ----------
+
+    sealed class LensCapture
+    {
+        public required WindowCapture Capture;
+        public required System.Windows.Controls.Image Image;
+        public System.Windows.Media.Imaging.WriteableBitmap? Bitmap;
+        public (byte[] px, int w, int h, RECT at)? Pending; // newest frame not yet drawn (guarded by lock on this)
+    }
+    readonly Dictionary<IntPtr, LensCapture> _captures = new();
+    readonly HashSet<IntPtr> _noCapture = new();
+
+    /// <summary>Capture exactly the windows behind the bar (Windows.Graphics.Capture), stacked in z-order.</summary>
+    void SyncCaptures(List<IntPtr> behind)
+    {
+        foreach (var h in _captures.Keys.Except(behind).ToList()) DropCapture(h);
+        RECT crop;
+        try
+        {
+            var tl = Bar.PointToScreen(new Point(0, 0));
+            var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
+            int b = (int)Math.Ceiling(_lensBleed * VisualTreeHelper.GetDpi(this).DpiScaleX); // the blur needs pixels past the edge
+            crop = new RECT { Left = (int)Math.Floor(tl.X) - b, Top = (int)Math.Floor(tl.Y) - b, Right = (int)Math.Ceiling(br.X) + b, Bottom = (int)Math.Ceiling(br.Y) + b };
+        }
+        catch (InvalidOperationException) { return; }
+        foreach (var h in behind)
+        {
+            if (_captures.TryGetValue(h, out var existing)) { existing.Capture.Crop = crop; continue; }
+            try
+            {
+                var cap = new WindowCapture(h) { Crop = crop };
+                var lc = new LensCapture { Capture = cap, Image = new System.Windows.Controls.Image { Stretch = Stretch.Fill, IsHitTestVisible = false } };
+                RenderOptions.SetBitmapScalingMode(lc.Image, BitmapScalingMode.NearestNeighbor);
+                cap.Frame += (px, w, h2, at) => QueueCaptureFrame(lc, px, w, h2, at);
+                _captures[h] = lc;
+                Log.Info($"Liquid Glass: capturing {GetClassNameOf(h)} behind the {(IsPrimary ? "primary" : "secondary")} dock");
+            }
+            catch (Exception ex)
+            {
+                _noCapture.Add(h);
+                Log.Warn($"Liquid Glass: can't capture {GetClassNameOf(h)} ({ex.Message}); using the live blur while it's there");
+                Dispatcher.BeginInvoke(UpdateGlass);
+                return;
+            }
+        }
+        // Wallpaper first, then the windows from the bottom of the z-order up, so the topmost is drawn last.
+        LensWindows.Children.Clear();
+        if (_lensWall != null) LensWindows.Children.Add(_lensWall);
+        for (int i = behind.Count - 1; i >= 0; i--)
+            if (_captures.TryGetValue(behind[i], out var lc)) LensWindows.Children.Add(lc.Image);
+    }
+
+    void QueueCaptureFrame(LensCapture lc, byte[] px, int w, int h, RECT at)
+    {
+        bool schedule;
+        lock (lc)
+        {
+            if (lc.Pending is { } old) System.Buffers.ArrayPool<byte>.Shared.Return(old.px);
+            schedule = lc.Pending == null;
+            lc.Pending = (px, w, h, at);
+        }
+        if (schedule) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Render, () => DrawCaptureFrame(lc));
+    }
+
+    void DrawCaptureFrame(LensCapture lc)
+    {
+        (byte[] px, int w, int h, RECT at) f;
+        lock (lc) { if (lc.Pending is not { } p) return; f = p; lc.Pending = null; }
+        try
+        {
+            if (!_captures.ContainsValue(lc) || !_lensActive) return;
+            double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+            if (lc.Bitmap == null || lc.Bitmap.PixelWidth != f.w || lc.Bitmap.PixelHeight != f.h)
+            {
+                lc.Bitmap = new System.Windows.Media.Imaging.WriteableBitmap(f.w, f.h, 96 * dpi, 96 * dpi, PixelFormats.Pbgra32, null);
+                lc.Image.Source = lc.Bitmap;
+                lc.Image.Width = f.w / dpi;
+                lc.Image.Height = f.h / dpi;
+            }
+            lc.Bitmap.WritePixels(new Int32Rect(0, 0, f.w, f.h), f.px, f.w * 4, 0);
+            var origin = Bar.PointToScreen(new Point(0, 0)); // the scene canvas starts one bleed above-left of the bar
+            Canvas.SetLeft(lc.Image, (f.at.Left - origin.X) / dpi + _lensBleed);
+            Canvas.SetTop(lc.Image, (f.at.Top - origin.Y) / dpi + _lensBleed);
+        }
+        catch (InvalidOperationException) { }
+        finally { System.Buffers.ArrayPool<byte>.Shared.Return(f.px); }
+    }
+
+    void DropCapture(IntPtr h)
+    {
+        if (!_captures.Remove(h, out var lc)) return;
+        lc.Capture.Dispose();
+        LensWindows.Children.Remove(lc.Image);
+        lock (lc) { if (lc.Pending is { } old) { System.Buffers.ArrayPool<byte>.Shared.Return(old.px); lc.Pending = null; } }
+    }
+
+    void DropCaptures()
+    {
+        foreach (var h in _captures.Keys.ToList()) DropCapture(h);
+    }
+
+    void ShowLens()
+    {
+        _backdrop?.HideBackdrop();
+        Bar.Background = null;
+        Rect lens, monitor;
+        double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        try
+        {
+            var tl = Bar.PointToScreen(new Point(0, 0));
+            var br = Bar.PointToScreen(new Point(Bar.ActualWidth, Bar.ActualHeight));
+            lens = new Rect(tl, br);
+            var m = MonitorInfo(out _).rcMonitor;
+            monitor = new Rect(m.Left, m.Top, m.Width, m.Height);
+        }
+        catch (InvalidOperationException) { return; }
+        if (lens.Width < 4 || lens.Height < 4) return;
+        // What the lens bends is the scene behind the bar, blurred on the GPU first (frosted body). The scene canvas
+        // overhangs the bar by the blur radius so the blur has real pixels at the edges instead of fading to black.
+        double blur = 3 + Math.Clamp(Settings.Current.GlassBlur, 0, 100) / 100 * 15;
+        _lensBleed = Math.Ceiling(blur + 2);
+        double bleedPx = _lensBleed * dpi;
+        // The whole width of the monitor at the bar's height: width changes (magnification, widgets) reuse the slice.
+        double top = Math.Max(monitor.Top, Math.Floor(lens.Top - bleedPx)), bottom = Math.Min(monitor.Bottom, Math.Ceiling(lens.Bottom + bleedPx));
+        var strip = new Rect(monitor.Left, top, monitor.Width, bottom - top);
+        int request = ++_lensRequest;
+        WallpaperGlass.SliceAsync(strip, monitor).ContinueWith(t => Dispatcher.BeginInvoke(() =>
+        {
+            if (request != _lensRequest) return;
+            if (t.IsFaulted || t.Result == null)
+            {
+                Log.Info($"Liquid Glass: no wallpaper strip ({t.Exception?.GetBaseException().Message ?? "no wallpaper file"}); live blur instead");
+                _lensRequest++; HideLens(); if (LiveBlurOn) SyncBackdrop(); return;
+            }
+            double sceneLeft = lens.Left - bleedPx, sceneTop = lens.Top - bleedPx, sceneW = lens.Width + 2 * bleedPx;
+            var brush = new ImageBrush(t.Result)
+            {
+                Stretch = Stretch.Fill,
+                ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
+                Viewbox = new Rect((sceneLeft - strip.Left) / strip.Width, 0, sceneW / strip.Width, 1),
+            };
+            RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
+            brush.Freeze();
+            _lensWall ??= new System.Windows.Shapes.Rectangle { IsHitTestVisible = false };
+            _lensWall.Fill = brush;
+            _lensWall.Width = sceneW / dpi;
+            _lensWall.Height = strip.Height / dpi;
+            Canvas.SetLeft(_lensWall, 0);
+            Canvas.SetTop(_lensWall, (strip.Top - sceneTop) / dpi);
+            if (!LensWindows.Children.Contains(_lensWall)) LensWindows.Children.Insert(0, _lensWall);
+            LensWindows.Margin = new Thickness(-_lensBleed);
+            LensWindows.Effect = blur < 0.5 ? null : new System.Windows.Media.Effects.BlurEffect
+            {
+                Radius = blur, KernelType = System.Windows.Media.Effects.KernelType.Gaussian,
+                RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
+            };
+            Lens.Background = null;
+            _lensFx ??= new LiquidGlassEffect();
+            double w = Bar.ActualWidth * dpi, h = Bar.ActualHeight * dpi, radius = BarRadius * ThemeManager.SizeScale * dpi;
+            bool light = ThemeManager.Current.IsLight || (Settings.Current.AdaptiveTheme && _adaptiveLight == true);
+            _lensFx.Geometry = new System.Windows.Media.Media3D.Point4D(w, h, radius, Math.Min(h * 0.38, 18 * dpi));
+            _lensFx.Lens = new System.Windows.Media.Media3D.Point4D(10 * dpi, 1 * dpi, 1.4, 1.2 * dpi);
+            _lensFx.Light = new System.Windows.Media.Media3D.Point4D(-0.45, -1, light ? 0.45 : 0.6, light ? 0.05 : 0.07);
+            _lensFx.Tint = light ? new System.Windows.Media.Media3D.Point4D(1, 1, 1, 0.22) : new System.Windows.Media.Media3D.Point4D(0.03, 0.04, 0.06, 0.24);
+            Lens.Effect = _lensFx;
+            Lens.Visibility = Visibility.Visible;
+            // The lens is the glass now: the flat tint, sheen and rim drawn for the blur would only muddy it.
+            Tint.Opacity = 0.25;
+            Sheen.Visibility = Visibility.Collapsed;
+            Rim.Visibility = Visibility.Collapsed;
+            if (!_lensActive) Log.Info($"Liquid Glass lens on ({(IsPrimary ? "primary" : "secondary")} dock, {t.Result.PixelWidth}×{t.Result.PixelHeight} wallpaper strip)");
+            _lensActive = true;
+        }));
+    }
+
+    void HideLens()
+    {
+        DropCaptures();
+        if (!_lensActive && Lens.Visibility == Visibility.Collapsed) return;
+        Log.Info($"Liquid Glass lens off ({(IsPrimary ? "primary" : "secondary")} dock): {(LensWanted ? "a window is behind the bar" : "not wanted")}");
+        _lensRequest++;
+        _lensActive = false;
+        Lens.Visibility = Visibility.Collapsed;
+        LensWindows.Effect = null;
+        if (_lensWall != null) { LensWindows.Children.Remove(_lensWall); _lensWall = null; }
+        Lens.Effect = null;
+        Lens.Background = null;
+        Tint.Opacity = 1;
+        Sheen.Visibility = Visibility.Visible;
+        Rim.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Windows moved or the front window changed: re-check whether anything is behind the bar (debounced).</summary>
+    void OnScreenMovedForLens()
+    {
+        if (!LensWanted && !_lensActive) return;
+        _lensDebounce ??= new System.Windows.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(150), System.Windows.Threading.DispatcherPriority.Background,
+            (_, _) => { _lensDebounce!.Stop(); UpdateGlass(); }, Dispatcher);
+        _lensDebounce.Stop();
+        _lensDebounce.Start();
     }
 
     void ApplySpacing()

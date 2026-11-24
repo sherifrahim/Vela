@@ -21,6 +21,10 @@
                     BorderThickness="{DynamicResource Hairline}"
                     BorderBrush="{DynamicResource Bar.Border}">
                 <Grid>
+                    <!-- Liquid Glass: the wallpaper under the bar, refracted on the GPU (LiquidGlassEffect). -->
+                    <Border x:Name="Lens" CornerRadius="16" Margin="-3" IsHitTestVisible="False" Visibility="Collapsed">
+                        <Grid ClipToBounds="True"><Canvas x:Name="LensWindows" /></Grid>
+                    </Border>
                     <Border x:Name="Tint" CornerRadius="16" Margin="-3"
                             Background="{DynamicResource Bar.Background}" />
                     <Border x:Name="Shade" CornerRadius="16" Margin="-3" IsHitTestVisible="False"

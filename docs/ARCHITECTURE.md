@@ -50,8 +50,11 @@ rectangle regardless of the region (visible as black/blurred square corners). In
 (+ saturation lift = macOS vibrancy), mapped with an
 `ImageBrush.Viewbox` so it lines up with the real wallpaper under the bar (handles Fill + Stretch fits;
 solid-colour desktops too). Recomputed on bar move/resize and on `WM_SETTINGCHANGE(SPI_SETDESKWALLPAPER)`.
-Limitation: windows dragged *behind* the dock aren't reflected. Live refraction = roadmap
-(Windows.Graphics.Capture → D3D11 shader, only while something moves, like the original).
+**Liquid Glass lens** (Liquid Glass style + `LiquidRefraction`, the default): `DockWindow.Lens` shows a scene = full-res
+wallpaper strip (`WallpaperGlass.SliceAsync`) + live captures of the windows behind the bar (`WindowCapture`,
+Windows.Graphics.Capture per window, GPU crop, ≤20 fps, unchanged frames dropped), GPU-blurred, then bent by
+`LiquidGlassEffect` (HLSL compiled at runtime by d3dcompiler_47). Falls back to the live blur when the shader or
+capture is unavailable (Windows 10 can't hide the capture border). Costs nothing while nothing behind it changes.
 
 Cards are solid (`Flyout.Background`, #181818 on the dark styles), like the reference. The picker and control panel
 are frosted while `LiveBlur` is on: `GlassWindow.LiveBackdrop = true` places a `BackdropWindow` under `RegionElement`

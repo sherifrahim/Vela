@@ -15,7 +15,7 @@ namespace Vela.Theming;
 /// Why: DWM blur (accent policy / Mica) ignores window regions on layered windows, so it can't be
 /// clipped to a rounded bar. Since the dock reserves its screen strip, what's behind it is almost
 /// always the wallpaper anyway. Cost: one ~200px bitmap, decoded once per wallpaper change, 0 CPU after.
-/// Live refraction of moving windows is a roadmap item (Windows.Graphics.Capture + shader).
+/// The Liquid Glass style refracts a full-res slice of it plus live window captures instead (LiquidGlass, WindowCapture).
 /// </summary>
 public static class WallpaperGlass
 {
@@ -88,6 +88,58 @@ public static class WallpaperGlass
         RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
         brush.Freeze();
         return brush;
+    }
+
+    static readonly Dictionary<string, BitmapSource> _slices = new();
+
+    /// <summary>
+    /// Full-resolution wallpaper under <paramref name="screenRect"/> (physical px) for the Liquid Glass lens. Decoded
+    /// off the UI thread at the monitor's scale and cropped to the strip, so only the strip stays in memory; cached by
+    /// wallpaper file, fit style and rectangle.
+    /// </summary>
+    public static Task<BitmapSource?> SliceAsync(Rect screenRect, Rect monitor)
+    {
+        var path = WallpaperPath();
+        if (path == null || monitor.Width <= 0 || screenRect.Width <= 0) return Task.FromResult<BitmapSource?>(null);
+        var style = WallpaperStyle();
+        string key = $"{path}|{File.GetLastWriteTimeUtc(path).Ticks}|{style}|{screenRect}|{monitor}";
+        lock (_slices) if (_slices.TryGetValue(key, out var hit)) return Task.FromResult<BitmapSource?>(hit);
+        return Task.Run(() =>
+        {
+            try
+            {
+                int srcW, srcH;
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var frame = BitmapDecoder.Create(fs, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                    srcW = frame.PixelWidth; srcH = frame.PixelHeight;
+                }
+                bool stretch = style == "2";
+                double cover = Math.Max(monitor.Width / srcW, monitor.Height / srcH);
+                int decodeW = (int)Math.Min(srcW, Math.Ceiling(srcW * cover)); // never upscale while decoding
+                var bmp = new BitmapImage();
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.DecodePixelWidth = decodeW; bmp.StreamSource = fs; bmp.EndInit();
+                }
+                double w = bmp.PixelWidth, h = bmp.PixelHeight;
+                double sx = monitor.Width / w, sy = monitor.Height / h, s = stretch ? 0 : Math.Max(sx, sy);
+                double offX = stretch ? 0 : (monitor.Width - w * s) / 2, offY = stretch ? 0 : (monitor.Height - h * s) / 2;
+                double ix(double x) => stretch ? (x - monitor.X) / sx : (x - monitor.X - offX) / s;
+                double iy(double y) => stretch ? (y - monitor.Y) / sy : (y - monitor.Y - offY) / s;
+                int x0 = (int)Math.Clamp(Math.Floor(ix(screenRect.Left)), 0, w - 1), y0 = (int)Math.Clamp(Math.Floor(iy(screenRect.Top)), 0, h - 1);
+                int x1 = (int)Math.Clamp(Math.Ceiling(ix(screenRect.Right)), x0 + 1, w), y1 = (int)Math.Clamp(Math.Ceiling(iy(screenRect.Bottom)), y0 + 1, h);
+                var crop = new FormatConvertedBitmap(new CroppedBitmap(bmp, new Int32Rect(x0, y0, x1 - x0, y1 - y0)), PixelFormats.Bgra32, null, 0);
+                int cw = crop.PixelWidth, ch = crop.PixelHeight, stride = cw * 4;
+                var px = new byte[stride * ch];
+                crop.CopyPixels(px, stride, 0);
+                var slice = BitmapSource.Create(cw, ch, 96, 96, PixelFormats.Bgra32, null, px, stride); // detached copy: the full image can go
+                slice.Freeze();
+                lock (_slices) { if (_slices.Count > 8) _slices.Clear(); _slices[key] = slice; }
+                return (BitmapSource?)slice;
+            }
+            catch (Exception ex) { Log.Warn("Liquid Glass wallpaper slice: " + ex.Message); return null; }
+        });
     }
 
     static string? WallpaperPath()

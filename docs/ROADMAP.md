@@ -83,8 +83,8 @@ Todo, roughly by value:
 - [ ] App folders (2×2 mini-icon tile), recent-apps section, minimize-to-dock hint
 
 ## P2 — glass & animation
-- [ ] Live Liquid Glass: Windows.Graphics.Capture of the strip behind the dock → D3D11/Win2D refraction
-      shader, rendered only while the capture changes (rest at 0 CPU otherwise). Keep WallpaperGlass as fallback.
+- [x] Live Liquid Glass (2026-11-19): ps_3_0 refraction shader over the wallpaper + Windows.Graphics.Capture of the windows
+      behind the dock (`Theming/LiquidGlass.cs`, `Theming/WindowCapture.cs`). Still to do: same lens on cards/picker.
 - [ ] App launch bounce ✔ exists; add minimize-to-dock "genie"-style hint animation on the icon
 - [ ] Mac-style window open/close/minimize animations for *other* apps: only possible by injecting into
       DWM/explorer (that's what Windhawk mods do). Out of scope for Vela core; if wanted, ship as a separate,

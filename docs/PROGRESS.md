@@ -4,6 +4,44 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-19 — Claude (Opus 5.5) — session 7: real Liquid Glass (refraction, live)
+
+Owner: "i need that og liquid glass or blur, achieve it at any cost."
+
+**Built (uncommitted)**
+- `Theming/LiquidGlass.cs`: HLSL pixel shader compiled at startup with Windows' own `d3dcompiler_47.dll` (ps_3_0,
+  ~2.3 KB) + `LiquidGlassEffect` (WPF `ShaderEffect`). Rounded-box SDF → surface normal → lens profile: the flat
+  middle stays clear, the rim pulls the image inwards (refraction), splits red/blue (dispersion), and catches light
+  on the edge facing the light plus a dimmer bounce opposite.
+- `Theming/WindowCapture.cs`: Windows.Graphics.Capture of **one window** (not the screen, so Vela is never in its
+  own input and the dock still appears in screenshots). Hand-rolled D3D11 interop (no packages): GPU crop of the
+  strip behind the bar → staging texture → BGRA. Max 20 fps with a trailing timer (the last change is never lost);
+  frames whose strip didn't change are dropped before they reach WPF. Refuses to run if the yellow capture border
+  can't be hidden (Windows 10) → live blur instead.
+- `DockWindow`: new `Lens` layer (Border + clipped `LensWindows` canvas). The scene = wallpaper strip
+  (`WallpaperGlass.SliceAsync`, full-res, off-thread, cached) + live captures of up to 3 windows behind the bar in
+  z-order, GPU-blurred (`BlurEffect`, radius from Settings → Blur strength) with a bleed margin so edges don't darken,
+  then bent by the shader. Re-checked on `ScreenEvents.Changed` / foreground change (150 ms debounce).
+  Click-through and topmost layered overlays are ignored (LG Switch's invisible overlay was a false positive).
+- Settings → "Liquid Glass refraction" (`LiquidRefraction`, default on). Only for the Liquid Glass style.
+
+**Verified:** build 0/0, tests 24/24, live on both displays (primary screenshot + display-2 capture): frosted window
+content behind the bar, bright refracted rim top-left, rounded lens corners, no capture border on the captured
+window. CPU: lens on 2.11 % vs lens off 2.42 % under the same load (a streaming chat window behind each dock) → the
+lens costs nothing measurable; capture delivered ~0.2 frames/s, ~1.7/s arrived and were deduplicated.
+`--quit` → "Vela stopped cleanly".
+
+**Not verified:** dragging a window across the bar (no input on display 1 while the owner may be gaming), light
+style tint, top-edge docks, video playing behind the bar (worst case: 20 fps of re-render).
+
+**Next up**
+1. `Views/DockWindow.xaml.cs` `ShowLens`: tune by eye with the owner (rim width `h*0.38`, refraction `10*dpi`,
+   tint 0.24 dark / 0.22 light). Maybe expose "Refraction strength" in Settings.
+2. Apply the same lens to cards / picker (`GlassWindow.LiveBackdrop` path) — same scene + effect.
+3. Check a top-docked bar (light direction should flip: `Light` y sign).
+
+---
+
 ## 2026-11-17 — Claude (Opus 5.5) — session 6: closer to the reference (colours, cards, Start, defaults)
 
 Owner: "are we like lumabar now? … change the behaviour and themes and colours to match; you can overwrite my settings."
