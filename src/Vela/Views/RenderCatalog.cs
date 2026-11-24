@@ -72,6 +72,14 @@ public static class RenderCatalog
         foreach (var (name, view, big) in IslandWindow.Previews())
             island.Children.Add(V(Text(name, 9, FontWeights.SemiBold, "Text.Secondary").Margin(4, 0, 0, 4), IslandWindow.PreviewPill(view, big)).Margin(0, 0, 0, 14));
         Save(Backdrop(island), Path.Combine(dir, "island.png"));
+        if (!publicSafe) // the launcher lists this PC's apps and files: never in public renders
+        {
+            Vela.Services.Launcher.LoadAppsNow();
+            var launcher = new StackPanel();
+            foreach (var q in new[] { "", "set", "12*(3+4)", "progress" }) launcher.Children.Add(LauncherWindow.Preview(q).Margin(0, 0, 0, 18));
+            Pump(TimeSpan.FromSeconds(1.5));
+            Save(Backdrop(launcher), Path.Combine(dir, "launcher.png"));
+        }
         Log.Info($"Rendered dock + {catalog.Count} widgets to {dir}");
     }
 

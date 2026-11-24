@@ -68,7 +68,8 @@ Todo, roughly by value:
 - [ ] Quick toggles: hotspot, airplane, energy saver, Ethernet status, user-selectable toggles
 - [x] Weather hourly / today & forecast / status / sunrise tiles
 - [ ] Brightness for external monitors (DDC/CI via dxva2 `SetMonitorBrightness`)
-- [ ] Search / Commands launcher, Recently opened, Screenshot capture
+- [~] Search launcher (Alt+Space, Search tile, `--search`): apps, Windows Settings pages, commands, calculator, files (Windows Search
+      index), web; learns from what you open (2026-11-24, rendered off-screen; live check pending). Recently opened / Screenshot exist as tiles
 - [~] AI: DeepSeek, GLM, OpenCode done; Gemini (Antigravity), Grok, Cursor open
 - [x] Finance: Polar, Dodo, Shopify, Lemon Squeezy, Paddle, Gumroad, Total Revenue (+ charts) — untested with real keys
 - [x] GitHub activity grid / overview, Gmail (own OAuth client, loopback redirect), LeetCode

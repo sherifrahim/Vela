@@ -24,6 +24,7 @@ public static class Glyphs
     public const string Mail = "", Globe = "", Code = "", Lightning = "", Plug = "";
     public const string Skip = "", Reset = "", Download = "", Upload = "";
     public const string Grid = "", AllApps = "", Cpu = "", Memory = "", Network = "";
+    public const string Calculator = "", Folder = "", Document = "";
     public const string Money = "", Chart = "", Note = "", Task = "", Lock = "";
     // Segoe Fluent / MDL2: CommandPrompt (U+E756), Shield (U+EA18).
     public const string Terminal = "", Shield = "";

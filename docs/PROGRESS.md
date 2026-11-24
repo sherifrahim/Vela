@@ -4,6 +4,46 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-24 — Claude (Opus 5.5) — session 11: search launcher (Spotlight-style)
+
+Owner chose "salvage from the WacOS MIT snapshot", search launcher first. Design from WacOS `2beced5`
+`src/shell/spotlight.cpp` (MIT, credited); code is Vela's own.
+
+**Changed (committed as is at the owner's request; live check still pending)**
+- `Services/Launcher.cs`: sources + ranking. Apps = shell:AppsFolder enumerated on an STA thread (IShellItem /
+  IEnumShellItems, read ~0.8 s for 144 apps, cached 10 min, preloaded when the hotkey registers); score tiers
+  (whole 120 › start 100 › word start 80 › initials 70 › anywhere 50, accents folded); bonuses from Windows'
+  UserAssist counts, what you opened from the launcher with which text (`%LOCALAPPDATA%\Vela\search-usage.json`, ≤ 8
+  texts per item) and the dock (pinned +20, open +12). 36 Windows Settings pages with keywords, Vela pages (Settings,
+  Add widgets) and the Commands tile's quick actions, a calculator (+ − × ÷ ^ %, parentheses, '.' decimals; Enter
+  copies), paths/URLs run directly, files & folders from the Windows Search index (ADO late-bound, no package; by
+  name, newest first, no AppData/recycle bin), and "Search the web" (Google, only when chosen; no suggestions fetched
+  while typing, unlike WacOS — privacy rule).
+- `Views/LauncherWindow.cs`: frosted panel (GlassWindow + live backdrop) a fifth of the way down the pointer's display;
+  Top Hit, Apps, Settings, Commands, Files & Folders, Web; ↑/↓/Tab/PgUp/PgDn, Enter, Ctrl+Enter = show in Explorer,
+  Esc clears then closes; closes when it loses focus. Empty field = your most-used apps.
+- Opening it: **Alt+Space** (`Settings.SearchHotkey`, default on, Settings toggle; main dock registers it, logs if
+  taken), the Search tile (Win+S moved to its menu), `Vela.exe --search` (AllowSetForegroundWindow from the CLI).
+- `--render` writes `launcher.png` (4 sample queries; skipped with `--public`: it shows this PC's apps and files).
+- Glyphs: Calculator, Folder, Document. `CommandsWidget.Quick`/`Run` are now internal (shared). Tests `LauncherTests`.
+
+**Verified:** build 0/0; tests 49/49; `launcher.png` (empty = most-used apps with real icons; "set" → Settings app top
+hit, WSL Settings, indexed files; "12*(3+4)" → 84; "progress" → indexed file + web); live: `--search` opened the
+window on the primary and the app list loaded.
+**Not verified / open:** the live look. While testing, the owner installed **WacOS (full mode, 10:24)** and Vela was
+shut down twice (10:23 before the install, 10:26 after I restarted Vela on top of WacOS). One live capture showed the
+frost *above* the launcher (a blurred copy of its rows) — taken with WacOS running, so unclear whether it's Vela's
+bug; re-check with Vela alone (z-order of "Vela Search" vs its "Vela Backdrop"; `LauncherWindow.ShowOnPointerDisplay`
+re-orders the window after the backdrop is placed). Keyboard flow, Alt+Space, learning and opening results not tried
+by hand. `D:\` isn't in the Windows Search index here, so repo files don't show.
+
+**Next up**
+1. With Vela running alone: open the launcher (Alt+Space), check z-order/frost, type, open results, Ctrl+Enter, Esc.
+2. Commit once the owner has looked.
+3. More from WacOS `2beced5` (folder stacks `pilhas.cpp`/`pastas.cpp`, genie hint `genio.cpp`); never `D:\WacOS-dev`.
+
+---
+
 ## 2026-11-24 — Claude (Opus 5.5) — session 10: windows under the dock, duplicate Store-app pins
 
 Owner reported: maximized apps run under the dock on both displays; Claude shows twice (one without an icon).

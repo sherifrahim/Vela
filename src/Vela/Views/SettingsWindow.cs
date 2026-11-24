@@ -204,6 +204,7 @@ public sealed class SettingsWindow : GlassWindow
             .Select(x => Segment(x.Item2, "displays", s.Displays == x.Item1, () => { s.Displays = x.Item1; Settings.Save("displays"); }))),
             "With several monitors, each one gets its own dock with the same widgets.");
         Toggle("Lock dock", "Widgets, apps and the bar stay where they are; rearrange them only while the widget picker is open.", s.LockDock, v => { s.LockDock = v; Settings.Save("dock"); });
+        Toggle("Alt+Space opens Search", "Find apps, settings, files and commands, do quick maths, or search the web. Turn off if another launcher uses Alt+Space.", s.SearchHotkey, v => { s.SearchHotkey = v; Settings.Save("dock"); });
         Toggle("Alt+T opens PowerShell (admin)", "PowerShell as administrator from anywhere (Windows asks to confirm). Turn off if an app needs Alt+T.", s.AdminShellHotkey, v => { s.AdminShellHotkey = v; Settings.Save("dock"); });
         Field("Open indicator", Wrap(new[] { ("dot", "Dot"), ("large", "Large dot"), ("line", "Line") }
             .Select(x => Segment(x.Item2, "indicator", s.OpenIndicator == x.Item1, () => { s.OpenIndicator = x.Item1; Settings.Save("pins"); }))),

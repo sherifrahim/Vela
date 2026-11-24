@@ -43,8 +43,9 @@ https://github.com/renzyxx/WacOS at commit `2beced5` (2026-11-20), the revision 
 (later revisions use other licenses; nothing from them is used).
 
 Used in `src/Vela/Theming/LiquidGlass.cs` (Snell's-law lens profile, specular rim and the glass constants from
-`src/shell/backdrop.cpp`) and `src/Vela/Services/GameMode.cs` (game detection from `src/shell/jogo.cpp`) and `src/Vela/Theming/CompositionFrost.cs` (the
-frost recipe from `src/shell/backdrop.cpp`: host backdrop → Gaussian blur σ16 → saturation 1.65, rounded geometric clip).
+`src/shell/backdrop.cpp`) and `src/Vela/Services/GameMode.cs` (game detection from `src/shell/jogo.cpp`), `src/Vela/Services/Launcher.cs` + `src/Vela/Views/LauncherWindow.cs` (the search launcher's design from
+`src/shell/spotlight.cpp`: sources, tiered name score, learning, calculator grammar, layout) and
+`src/Vela/Theming/CompositionFrost.cs` (the frost recipe from `src/shell/backdrop.cpp`: host backdrop → Gaussian blur σ16 → saturation 1.65, rounded geometric clip).
 
 ```
 MIT License

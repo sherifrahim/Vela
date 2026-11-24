@@ -198,10 +198,12 @@ public sealed class SearchWidget : WidgetBase
     {
         var pill = new Border { Width = 128, Height = 26, CornerRadius = new CornerRadius(13), Padding = new Thickness(10, 0, 10, 0) }.Bg("Fill.Control");
         pill.Child = H(Icon(Glyphs.Search, 10.5, "Text.Secondary").Margin(0, 0, 7, 0), Text("Search", 9.5, FontWeights.SemiBold, "Text.Secondary"));
-        ToolTip = "Search (Win+S)";
+        ToolTip = Settings.Current.SearchHotkey ? "Search (Alt+Space)" : "Search";
         return pill;
     }
-    protected override void OnClick() => WinActions.SendKeys(0x5B, 0x53); // Win+S
+    protected override void OnClick() => Views.LauncherWindow.Toggle();
+    protected override void AddMenuItems(ContextMenu menu) =>
+        menu.Items.Add(Item("Windows Search (Win+S)", () => WinActions.SendKeys(0x5B, 0x53)));
 }
 
 /// <summary>Command palette: type a program, path, URL or settings page and press Enter, or pick a quick action.</summary>
@@ -215,7 +217,7 @@ public sealed class CommandsWidget : WidgetBase
         return Icon(Glyphs.Lightning, 15);
     }
 
-    static readonly (string Name, string Hint, Action Run)[] Quick =
+    internal static readonly (string Name, string Hint, Action Run)[] Quick =
     {
         ("Lock", "Lock this PC", WinActions.LockPc),
         ("Run…", "The Windows Run box", () => WinActions.SendKeys(0x5B, 0x52)),
@@ -254,7 +256,7 @@ public sealed class CommandsWidget : WidgetBase
     }
 
     /// <summary>Like the Run box: a whole command line, else the first word as the program and the rest as arguments.</summary>
-    static bool Run(string cmd)
+    internal static bool Run(string cmd)
     {
         try
         {

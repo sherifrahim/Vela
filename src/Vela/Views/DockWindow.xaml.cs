@@ -1179,11 +1179,17 @@ public partial class DockWindow : GlassWindow
             WinActions.LaunchShell(WinActions.ShellKind.PowerShell, admin: true);
             handled = true;
         }
+        else if (msg == WM_HOTKEY && wParam.ToInt32() == SearchHotkeyId)
+        {
+            Dispatcher.BeginInvoke(LauncherWindow.Toggle);
+            handled = true;
+        }
         else if (msg == CommandMessage)
         {
             if (wParam.ToInt32() == 1) Dispatcher.BeginInvoke(OpenWidgetPicker);
             else if (wParam.ToInt32() == 2) Dispatcher.BeginInvoke(OpenSettings);
             else if (wParam.ToInt32() == 3 && Svc.TrayCreated) Dispatcher.BeginInvoke(Svc.Tray.LogIcons); // --tray-dump (diagnostics)
+            else if (wParam.ToInt32() == 4) Dispatcher.BeginInvoke(LauncherWindow.Toggle);
             handled = true;
         }
         else if (msg == WM_MOUSEACTIVATE)
@@ -1205,21 +1211,32 @@ public partial class DockWindow : GlassWindow
 
     // ------------------------------------------------------------------ global hotkeys
 
-    const int ShellHotkeyId = 0x5654; // "VT"
-    bool _shellHotkey;
+    const int ShellHotkeyId = 0x5654, SearchHotkeyId = 0x5653; // "VT", "VS"
+    bool _shellHotkey, _searchHotkey;
 
-    /// <summary>Alt+T: PowerShell as administrator, from anywhere (owner's choice). Only the main dock owns it.</summary>
+    /// <summary>
+    /// Alt+T: PowerShell as administrator (owner's choice); Alt+Space: the search launcher. From anywhere; only the main
+    /// dock owns them. Also hands the launcher Vela's own pages.
+    /// </summary>
     void SyncHotkeys()
     {
         if (!IsPrimary || Hwnd == IntPtr.Zero) return;
-        bool want = Settings.Current.AdminShellHotkey;
-        if (want == _shellHotkey) return;
-        if (want)
+        Vela.Services.Launcher.OpenVelaSettings ??= OpenSettings;
+        Vela.Services.Launcher.OpenWidgetPicker ??= OpenWidgetPicker;
+        Sync(ref _shellHotkey, Settings.Current.AdminShellHotkey, ShellHotkeyId, 0x54 /* T */, "Alt+T", "the admin PowerShell shortcut");
+        Sync(ref _searchHotkey, Settings.Current.SearchHotkey, SearchHotkeyId, 0x20 /* Space */, "Alt+Space", "the search shortcut");
+        if (_searchHotkey) Vela.Services.Launcher.RefreshApps(); // read the apps list in the background, ready for the first search
+
+        void Sync(ref bool on, bool want, int id, uint vk, string keys, string what)
         {
-            _shellHotkey = RegisterHotKey(Hwnd, ShellHotkeyId, MOD_ALT | MOD_NOREPEAT, 0x54 /* T */);
-            if (!_shellHotkey) Log.Warn("Alt+T is taken by another app; the admin PowerShell shortcut is off");
+            if (want == on) return;
+            if (want)
+            {
+                on = RegisterHotKey(Hwnd, id, MOD_ALT | MOD_NOREPEAT, vk);
+                if (!on) Log.Warn($"{keys} is taken by another app; {what} is off");
+            }
+            else { UnregisterHotKey(Hwnd, id); on = false; }
         }
-        else { UnregisterHotKey(Hwnd, ShellHotkeyId); _shellHotkey = false; }
     }
 
     /// <summary>Called from App.OnExit. Order matters: give back the screen space, then restore the taskbar.</summary>
@@ -1233,6 +1250,7 @@ public partial class DockWindow : GlassWindow
             {
                 foreach (var d in All.Where(x => !x.IsPrimary).ToList()) { d.Teardown(); d.Close(); }
                 if (_shellHotkey) { UnregisterHotKey(Hwnd, ShellHotkeyId); _shellHotkey = false; }
+                if (_searchHotkey) { UnregisterHotKey(Hwnd, SearchHotkeyId); _searchHotkey = false; }
                 if (Hwnd != IntPtr.Zero) Svc.Windows.Stop(Hwnd);
             }
             _appBar?.Dispose();
