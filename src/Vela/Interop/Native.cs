@@ -32,7 +32,7 @@ internal static class Native
     public const uint SWP_NOZORDER = 0x4;
     public const uint SWP_NOACTIVATE = 0x10;
     public const uint SWP_SHOWWINDOW = 0x40;
-    public static readonly IntPtr HWND_TOPMOST = new(-1);
+    public static readonly IntPtr HWND_TOPMOST = new(-1), HWND_NOTOPMOST = new(-2), HWND_BOTTOM = new(1);
 
     public const int WM_CLOSE = 0x0010;
     public const int WM_SETTINGCHANGE = 0x001A;

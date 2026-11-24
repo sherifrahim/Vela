@@ -88,6 +88,8 @@ Todo, roughly by value:
 - [x] Composition frost for `BackdropWindow` (HostBackdropBrush + blur σ16 + saturation 1.65, rounded AA clip)
 - [ ] Look at the frost over colourful content with the owner (picker, cards, bar in Game Mode or other styles)
 - [ ] Live drag reorder with a sliding neighbour gap (OpenTaskbar #130)
+- [x] Reserved space works with the tray host running (appbar calls step past it, 2026-11-24)
+- [x] Store-app pins by AUMID: survive app updates, launch via shell:AppsFolder, duplicates merged (2026-11-24)
 - [x] Live Liquid Glass (2026-11-19): ps_3_0 refraction shader over the wallpaper + Windows.Graphics.Capture of the windows
       behind the dock (`Theming/LiquidGlass.cs`, `Theming/WindowCapture.cs`). Still to do: same lens on cards/picker.
 - [ ] App launch bounce ✔ exists; add minimize-to-dock "genie"-style hint animation on the icon

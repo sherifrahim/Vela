@@ -207,6 +207,7 @@ public sealed class TrayHost
         }
     }
     public bool Running => _hwnd != IntPtr.Zero;
+    internal IntPtr Handle => _hwnd;
 
     public event Action? Changed
     {

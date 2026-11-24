@@ -4,6 +4,41 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-24 — Claude (Opus 5.5) — session 10: windows under the dock, duplicate Store-app pins
+
+Owner reported: maximized apps run under the dock on both displays; Claude shows twice (one without an icon).
+
+**Changed (committed)**
+- **Reserved space was lost whenever the tray host ran** (it's on with a Tray tile). `SHAppBarMessage` talks to the
+  first `Shell_TrayWnd` in z-order = Vela's host, which forwards to Explorer; Explorer returns success but never
+  updates the work area (both work areas were the full screen). A/B: tray host off → reserved. Fix:
+  `Shell/AppBar.Send` steps the host behind Explorer's tray (NOTOPMOST + BOTTOM) for each appbar call, then back to
+  TOPMOST (`Native.HWND_NOTOPMOST`/`HWND_BOTTOM` added). Other apps' appbars still go through the host (unchanged).
+- **Store-app pins** (Claude, ChatGPT/Codex) were saved as versioned `WindowsApps\…\x.exe` paths: Claude's update
+  5 → 6 left a dead pin (blank icon, failed launch) plus a new duplicate, and the Codex pin failed with "Access denied".
+  New `Shell/PackagedApps.cs`: AUMID from the process (`GetApplicationUserModelId`) or from an old path (package
+  family from the folder name + the installed manifest via `PackageManager`). Windows of packaged processes get that
+  AUMID, unpinned Store apps launch via `shell:AppsFolder\AUMID`, and `Settings.Migrate` fixes pins on every start
+  (AUMID launch path, duplicates merged, first position kept). Test `PinTests`.
+
+**Verified:** work areas reserved on both displays with the tray host running (primary 1500/1600, left 1138/1196),
+held over time; maximized windows on the left display stop at 1138; owner's pins migrated (log shows both Claude pins →
+`Claude_pzs8sxrjxfjjc!Claude`, merged; Codex → `OpenAI.CodexBeta_2p2nqsd0c76g0!App`); dock screenshot shows one
+Claude with its icon; tests 30/30; no ERROR lines; `--quit` → "Vela stopped cleanly". Backup of the owner's settings
+before migration: scratchpad `settings.before-pinfix.json` (not in the repo).
+**Not verified:** clicking the migrated ChatGPT pin to launch it (not clicked, it was already running in the owner's
+session); the Windows Settings window stayed 16 px into the strip (maximized before the fix; re-maximizing fits it).
+
+**Next up**
+1. Owner's request "salvage more from WacOS, option 3": only from the MIT snapshot `2beced5`
+   (scratchpad `ext/wacos-mit`, verified identical to `2beced5` ignoring line endings). `D:\WacOS-dev` is the current,
+   all-rights-reserved WacOS: do **not** use it unless a verifiable written permission from renzyxx is added to the repo.
+   Candidates vs ROADMAP: Search/Commands launcher (`src/shell/spotlight.cpp`), Stacks/folders on the dock
+   (`pilhas.cpp`, `pastas.cpp`), minimize-to-dock genie hint (`genio.cpp`).
+2. Then the session-9 list (frost look with the owner, sliding drag gap, per-app media volume, smoke.ps1 on PS 5.1).
+
+---
+
 ## 2026-11-24 — Claude (Opus 5.5) — session 9: composition frost behind every glass panel
 
 Owner: "Yes, build it" (next-up 1 of session 8).

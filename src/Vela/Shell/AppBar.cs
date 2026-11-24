@@ -22,11 +22,28 @@ internal sealed class AppBar : IDisposable
 
     APPBARDATA Data() => new() { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = _hwnd, uCallbackMessage = CallbackMessage };
 
+    /// <summary>
+    /// SHAppBarMessage goes to the first "Shell_TrayWnd" in z-order. While Vela's tray host runs, that is the host, which
+    /// forwards to Explorer: Explorer answers "success" but never changes the work area, so maximized windows ran under
+    /// the dock. Our own appbar calls therefore step the host behind Explorer's tray for the call (same UI thread as
+    /// the host's 1 Hz keep-on-top, so the two never race).
+    /// </summary>
+    static IntPtr Send(uint message, ref APPBARDATA d)
+    {
+        var host = Svc.TrayCreated && Svc.Tray.Running ? Svc.Tray.Handle : IntPtr.Zero;
+        if (host == IntPtr.Zero) return SHAppBarMessage(message, ref d);
+        const uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        SetWindowPos(host, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+        SetWindowPos(host, HWND_BOTTOM, 0, 0, 0, 0, flags);
+        try { return SHAppBarMessage(message, ref d); }
+        finally { SetWindowPos(host, HWND_TOPMOST, 0, 0, 0, 0, flags); }
+    }
+
     public void Register()
     {
         if (_registered) Unregister();
         var d = Data();
-        _registered = SHAppBarMessage(ABM_NEW, ref d) != IntPtr.Zero;
+        _registered = Send(ABM_NEW, ref d) != IntPtr.Zero;
     }
 
     /// <summary>Reserve <paramref name="thicknessPx"/> on an edge of <paramref name="monitor"/>. Returns the granted rect.</summary>
@@ -36,10 +53,10 @@ internal sealed class AppBar : IDisposable
         var d = Data();
         d.uEdge = top ? ABE_TOP : ABE_BOTTOM;
         d.rc = monitor;
-        SHAppBarMessage(ABM_QUERYPOS, ref d);
+        Send(ABM_QUERYPOS, ref d);
         if (top) d.rc.Bottom = d.rc.Top + thicknessPx;
         else d.rc.Top = d.rc.Bottom - thicknessPx;
-        SHAppBarMessage(ABM_SETPOS, ref d);
+        Send(ABM_SETPOS, ref d);
         return d.rc;
     }
 
@@ -51,14 +68,14 @@ internal sealed class AppBar : IDisposable
         d.uEdge = top ? ABE_TOP : ABE_BOTTOM;
         d.rc = monitor;
         if (top) d.rc.Bottom = d.rc.Top; else d.rc.Top = d.rc.Bottom;
-        SHAppBarMessage(ABM_SETPOS, ref d);
+        Send(ABM_SETPOS, ref d);
     }
 
     public void Unregister()
     {
         if (!_registered) return;
         var d = Data();
-        SHAppBarMessage(ABM_REMOVE, ref d);
+        Send(ABM_REMOVE, ref d);
         _registered = false;
     }
 

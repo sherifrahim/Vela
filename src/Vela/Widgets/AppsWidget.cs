@@ -127,7 +127,10 @@ public sealed class AppsWidget : WidgetBase
                     Key = w.GroupKey,
                     IconSource = IconFor(w),
                     Name = NameFor(w),
-                    LaunchPath = w.ExePath != null && !IsFrameHost(w.ExePath) ? w.ExePath : w.Aumid != null ? $"shell:AppsFolder\\{w.Aumid}" : null,
+                    // Store apps launch by AUMID (their versioned .exe can't be started directly: access denied).
+                    LaunchPath = w.Aumid != null && (w.ExePath == null || IsFrameHost(w.ExePath) || PackagedApps.IsPackagedPath(w.ExePath))
+                        ? PackagedApps.LaunchPathFor(w.Aumid)
+                        : w.ExePath != null && !IsFrameHost(w.ExePath) ? w.ExePath : null,
                 };
                 byKey[w.GroupKey] = g;
                 if (!_runningOrder.Contains(g.Key)) _runningOrder.Add(g.Key);

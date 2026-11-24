@@ -100,6 +100,9 @@ public static class Settings
     /// <summary>One-time upgrades of an existing settings.json (bump AppSettings.Version for each).</summary>
     static void Migrate()
     {
+        // Every start: Store-app pins follow the app across updates (stable AUMID instead of a versioned .exe path).
+        try { if (Vela.Shell.PackagedApps.FixPins(Current.PinnedApps)) SaveNow(); }
+        catch (Exception ex) { Log.Warn("Pin fix-up: " + ex.Message); }
         if (Current.Version < 2)
         {
             // v2: the Control Centre (quick settings) joins the dock, just before the clock.

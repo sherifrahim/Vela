@@ -102,7 +102,7 @@ public sealed class WindowTracker
                     Hwnd = h,
                     Pid = pid,
                     ExePath = exe,
-                    Aumid = ShellNative.GetWindowAumid(h),
+                    Aumid = ShellNative.GetWindowAumid(h) ?? (PackagedApps.IsPackagedPath(exe) ? PackagedApps.AumidForProcess(pid) : null),
                     Title = GetWindowTitle(h),
                 };
                 changed = true;

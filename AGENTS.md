@@ -109,6 +109,11 @@ reference/lumabar/       original app's public README + screenshots (reference o
   region. DWM blur/acrylic is **off** (on layered windows it fills the whole rectangle). The dock's glass is a
   live-blur `BackdropWindow` (falls back to the pre-blurred wallpaper slice). Cards, picker and control panel are
   frosted glass over their own `BackdropWindow` (`GlassWindow.LiveBackdrop`). Details in ARCHITECTURE.md.
+- **Tray host vs appbars:** `SHAppBarMessage` goes to the first `Shell_TrayWnd` in z-order, which is Vela's tray host while it
+  runs. Explorer answers forwarded appbar calls with "success" but never changes the work area (maximized windows then
+  run under the dock), so `Shell/AppBar.Send` steps the host behind Explorer's tray for each call. Keep that.
+- **Store apps:** never launch or pin a `C:\Program Files\WindowsApps\…` exe (versioned, access denied). Use the AUMID
+  (`Shell/PackagedApps`, `shell:AppsFolder\<AUMID>`); pins are fixed up on every start.
 - **Backdrop windows and focus:** never `Show()` a `BackdropWindow` (it can take activation and close the card above
   it); `Place()` uses `EnsureHandle` + `SWP_NOACTIVATE`, and `FlyoutWindow` re-activates itself if a "Vela Backdrop"
   window still grabs focus. Create them outside render/layout callbacks (defer with `Dispatcher.BeginInvoke`).
