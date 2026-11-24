@@ -33,10 +33,11 @@ public partial class App : Application
             bg.Show();
             Interop.Native.SetWindowPos(new System.Windows.Interop.WindowInteropHelper(bg).Handle, Interop.Native.HWND_TOPMOST, mon.Left + 150, mon.Bottom - 470, 1000, 420, Interop.Native.SWP_NOACTIVATE);
             int i = 0;
-            var variants = new (int, uint, int, bool)[] { (4, 0x01000000u, 0, true), (4, 0x01000000u, 0, false), (4, 0x10FFFFFFu, 0, false), (4, 0x00000000u, 0, false) };
+            // Rows: the composition frost (the default material), then accent Acrylic variants.
+            var variants = new (int, uint, int, bool)?[] { null, (4, 0x01000000u, 0, false), (4, 0x01000000u, 0, true), (4, 0x10FFFFFFu, 0, false) };
             foreach (var v in variants)
             {
-                var bw = new BackdropWindow(BackdropWindow.Kind.AccentAcrylic) { Raw = v };
+                var bw = v is { } raw ? new BackdropWindow(BackdropWindow.Kind.AccentAcrylic) { Raw = raw } : new BackdropWindow(BackdropWindow.Kind.Frost);
                 bw.Show();
                 int y = mon.Bottom - 470 + 20 + i * 100;
                 bw.Place(new Interop.Native.RECT { Left = mon.Left + 200, Top = y, Right = mon.Left + 1100, Bottom = y + 70 }, 28, IntPtr.Zero);

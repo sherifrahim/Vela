@@ -4,6 +4,40 @@ Newest entry first. Every agent session appends one entry (see AGENTS.md → Han
 
 ---
 
+## 2026-11-24 — Claude (Opus 5.5) — session 9: composition frost behind every glass panel
+
+Owner: "Yes, build it" (next-up 1 of session 8).
+
+**Changed (committed)**
+- `Theming/CompositionFrost.cs` (new): Windows.UI.Composition frost on the backdrop window. `DesktopWindowTarget`
+  (via `ICompositorDesktopInterop`, DispatcherQueue created on the UI thread), one sprite: `HostBackdropBrush` →
+  Gaussian blur σ16 (hard border) → saturation 1.65, clipped by an anti-aliased rounded geometry. Recipe from WacOS
+  `2beced5` (MIT); code is ours. The effect graph is two hand-made COM objects (`D2DEffect`, ComWrappers) instead of
+  Win2D. Any failure → logged once, accent Acrylic as before.
+- `Views/BackdropWindow.cs`: new `Kind.Frost` (now `Best`); region radius smaller than the clip (keeps the soft edge,
+  only far-corner clicks pass); swallows `WM_DPICHANGED` (WPF shrank the window 980 → 560 px when it moved from the
+  175 % display to the 100 % one; the same resize would have clipped the accent blur there too).
+- `--blur-test`: top row is now the frost, then the accent variants.
+- `tools/screenshot.ps1`: per-monitor DPI aware; `-Secondary` captures the other display.
+
+**Verified:** build 0/0, tests 28/28, picker on the left display fully frosted with smooth corners (6× zoom),
+`--blur-test` (frost noticeably more saturated than accent Acrylic, rounded corners vs square), both bars on the frost
+in Game Mode (temporary games.txt entry, removed), catalogue render OK, no ERROR lines, `--quit` → "Vela stopped
+cleanly". CPU unchanged at idle (the bars use the lens in Liquid Glass, so no frost is created until a panel opens or
+the lens is off; the frost itself is drawn by DWM).
+**Not verified:** cards/control panel on the primary (175 %) display by eye; Windows 10 (should fall back cleanly);
+"Transparency effects" off in Windows settings.
+
+**Next up**
+1. Owner looks at the frost over colourful content; tune `CompositionFrost.BlurSigma` / `Saturation` if needed.
+2. OpenTaskbar's live drag reorder with a sliding neighbour gap (`Views/Windows/MainWindow.DragDrop.cs`, #130) for
+   `Views/DockRow.cs`.
+3. Per-app media volume (OpenTaskbar `MediaWidget`: AUMID → WASAPI session) for Now Playing.
+4. `tools/smoke.ps1` fails under Windows PowerShell 5.1 (`$PSScriptRoot` empty in param defaults): resolve the
+   defaults inside the script body.
+
+---
+
 ## 2026-11-24 — Claude (Opus 5.5) — session 8: salvage from OpenTaskbar and WacOS
 
 Owner: salvage what's possible from OpenTaskbar (updated) and WacOS. Licences checked first: OpenTaskbar is MIT.

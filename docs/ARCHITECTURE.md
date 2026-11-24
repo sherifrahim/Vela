@@ -35,9 +35,23 @@ Every surface derives from `Views/GlassWindow`:
   "no region + window sized exactly to the bar + DWM rounded corners" to be usable.
 
 **Live blur (default, `LiveBlur`):** `Views/BackdropWindow` is a separate *non-layered*, borderless, non-activating
-window per dock, placed exactly under the bar (z-order right below its dock, rounded region inset 1 px so the
-aliased edge hides under the bar's anti-aliased rim) with the **accent-policy Acrylic** (state 4, flags 0, tint
-0x01000000, dark mode). DWM blurs whatever is behind it live, on the GPU. Tested alternatives: Win11 system
+window per dock (and per card / picker / control panel), placed exactly under the bar, z-order right below its dock.
+
+- **Material = composition frost** (`Theming/CompositionFrost.cs`, since session 9): a Windows.UI.Composition
+  `DesktopWindowTarget` on the backdrop window (`ICompositorDesktopInterop`, a DispatcherQueue on the UI thread) with
+  one sprite visual: `HostBackdropBrush` (window opted in with `DWMWA_USE_HOSTBACKDROPBRUSH` = 17) → Direct2D
+  Gaussian blur σ16 (hard border, no dark rim) → saturation 1.65, clipped by a `CompositionRoundedRectangleGeometry`
+  (anti-aliased corners of any radius). The two effect descriptions are hand-made COM objects (`D2DEffect`,
+  ComWrappers: IGraphicsEffect + IGraphicsEffectSource + IGraphicsEffectD2D1Interop), so no Win2D package.
+  `ICompositor.CreateEffectFactory` (slot 11) and `IPropertyValueStatics` (CreateSingle 14, CreateUInt32 11) are called
+  through their vtables; the slots were read from the projection assembly's own ABI IL. The window region uses a smaller
+  corner radius than the clip, so it never cuts the soft edge and only lets clicks through the far corners.
+- **Fallback = accent-policy Acrylic** (state 4, flags 0, tint 0x01000000, dark mode; region inset 1 px so its aliased
+  edge hides under the bar's anti-aliased rim) when composition can't start (logged once).
+- The backdrop window swallows `WM_DPICHANGED`: `Place()` sets its exact physical size, and WPF's "suggested rect"
+  would shrink it (980 → 560 px moving from 175 % to 100 %).
+
+DWM blurs whatever is behind it live, on the GPU. Tested alternatives: Win11 system
 backdrop (DWMSBT_TRANSIENTWINDOW) renders flat grey because a dock is never the active window; accent flags 2 and
 plain blur-behind render black. `Vela.exe --blur-test` re-runs that comparison on the second display.
 The dock then paints only its 40 % tint, shading and tiles over it (`Bar.Background` = null).

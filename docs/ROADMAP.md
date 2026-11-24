@@ -85,7 +85,8 @@ Todo, roughly by value:
 ## P2 — glass & animation
 - [x] Game Mode (2026-11-24): glass captures off + low priority while a game is in front (`Services/GameMode.cs`)
 - [x] Window previews: Aero Peek on hover, middle-click close (2026-11-24)
-- [ ] Composition frost for `BackdropWindow` (HostBackdropBrush + blur + saturation, rounded AA clip; see PROGRESS)
+- [x] Composition frost for `BackdropWindow` (HostBackdropBrush + blur σ16 + saturation 1.65, rounded AA clip)
+- [ ] Look at the frost over colourful content with the owner (picker, cards, bar in Game Mode or other styles)
 - [ ] Live drag reorder with a sliding neighbour gap (OpenTaskbar #130)
 - [x] Live Liquid Glass (2026-11-19): ps_3_0 refraction shader over the wallpaper + Windows.Graphics.Capture of the windows
       behind the dock (`Theming/LiquidGlass.cs`, `Theming/WindowCapture.cs`). Still to do: same lens on cards/picker.

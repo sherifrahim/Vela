@@ -48,7 +48,7 @@ Visual checks (no UI automation needed):
 **Prefer `--render`** (off-screen PNGs of the dock layout, the whole widget catalogue and Vela Island; it never
 touches the screen or the taskbar, so it works even while the owner is gaming). Run it from a separate build output
 (`dotnet build -o <dir>`) while the dock is running, because the running exe is locked.
-`tools/screenshot.ps1 -Out shot.png -CropBottom 140` captures the dock strip; `tools/vela-windows.ps1`
+`tools/screenshot.ps1 -Out shot.png -CropBottom 140` captures the dock strip (`-Secondary`: the other display); `tools/vela-windows.ps1`
 lists Vela's windows, rects and clip regions. Logs: `%LOCALAPPDATA%\Vela\logs\vela.log`.
 
 Tests: `dotnet test tests/Vela.Tests` (xUnit, pure logic; quit the dock first, it rebuilds Vela.exe).
@@ -99,7 +99,9 @@ reference/lumabar/       original app's public README + screenshots (reference o
 
 ## Known gotchas (learned the hard way)
 
-- **Live blur:** the dock's glass is a separate non-layered `BackdropWindow` under each bar (accent Acrylic). Keep it
+- **Live blur:** the dock's glass is a separate non-layered `BackdropWindow` under each bar (composition frost,
+  `Theming/CompositionFrost.cs`; accent Acrylic if composition fails). It must keep its own physical size across
+  displays: it swallows `WM_DPICHANGED`, else WPF shrinks it on the 100 % display. Keep it
   directly below its dock in z-order and hide it in fullscreen / auto-hide. System backdrops (Mica/Acrylic) do NOT work
   for a dock (never active → flat grey).
 - **Rendering:** windows are *layered* (`AllowsTransparency=true`) with **no** Win32 region (aliased corners);
@@ -133,7 +135,8 @@ reference/lumabar/       original app's public README + screenshots (reference o
   ones as `""` escapes; some shell tools mangle the raw characters.
 - The computer-use screenshot tool can't target Vela (not a Start-menu app). Use `tools/screenshot.ps1`.
 - The owner's main display is 2560×1600 at 175 % plus a 1920×1080 display at 100 % on the left (negative X).
-  Always reason in physical px for Win32, DIPs for WPF. `tools/screenshot.ps1` only captures the primary.
+  Always reason in physical px for Win32, DIPs for WPF. `tools/screenshot.ps1` captures the primary, or the other
+  display with `-Secondary`.
 
 ## Handoff protocol (Claude ⇄ Codex)
 

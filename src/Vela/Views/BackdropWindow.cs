@@ -12,13 +12,14 @@ namespace Vela.Views;
 ///
 /// DWM blur only works on a normal (non-layered) window, and the dock itself must stay layered for per-pixel
 /// alpha. So the blur lives in this separate, borderless window that sits exactly under the bar (z-ordered
-/// right below its dock), shaped to the bar with a rounded window region inset by a pixel so its aliased edge
-/// hides under the bar's anti-aliased rim. The dock draws its tint, shading and tiles on top.
-/// Material: Windows 11 22H2+ system backdrop "transient" (Acrylic); older builds use the accent-policy blur.
+/// right below its dock), shaped to the bar. The dock draws its tint, shading and tiles on top.
+/// Material: composition frost (<see cref="Theming.CompositionFrost"/>: host backdrop, blur, saturation, anti-aliased
+/// rounded clip). If composition can't start: the accent-policy Acrylic, with a rounded region inset by a pixel so its
+/// aliased edge hides under the bar's anti-aliased rim.
 /// </summary>
 public sealed class BackdropWindow : Window
 {
-    public enum Kind { SystemAcrylic, AccentAcrylic, AccentBlur }
+    public enum Kind { SystemAcrylic, AccentAcrylic, AccentBlur, Frost }
 
     /// <summary>Test hook: raw accent state / tint (AABBGGRR) / dark flag, overriding <see cref="Kind"/>.</summary>
     public (int State, uint Tint, int Flags, bool Dark)? Raw { get; init; }
@@ -32,7 +33,7 @@ public sealed class BackdropWindow : Window
     double _radiusPx;
 
     /// <summary>The material that blurs live even when the window is never active (system backdrops only render while active).</summary>
-    public static Kind Best => Kind.AccentAcrylic;
+    public static Kind Best => Kind.Frost;
 
     public BackdropWindow(Kind kind)
     {
@@ -59,6 +60,9 @@ public sealed class BackdropWindow : Window
         src.AddHook((IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled) =>
         {
             if (msg == WM_MOUSEACTIVATE) { handled = true; return new IntPtr(MA_NOACTIVATE); }
+            // Moving to a display with another scale: WPF would resize us to its "suggested" rect (e.g. 980 → 560 px
+            // from 175 % to 100 %). Place() sets the exact physical size, so keep it.
+            if (msg == WM_DPICHANGED) { handled = true; return IntPtr.Zero; }
             return IntPtr.Zero;
         });
         SetExStyle(_hwnd, GetExStyle(_hwnd) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
@@ -80,6 +84,13 @@ public sealed class BackdropWindow : Window
         try
         {
             if (Raw is { } raw) { SetAccent(raw.State, raw.Tint, raw.Flags); return; }
+            if (_kind == Kind.Frost)
+            {
+                _frost = Theming.CompositionFrost.Create(_hwnd);
+                if (_frost != null) return;
+                SetAccent(4, 0x01000000, 0); // composition unavailable: accent Acrylic, as before
+                return;
+            }
             if (_kind == Kind.SystemAcrylic)
             {
                 int t = DWMSBT_TRANSIENTWINDOW;
@@ -117,16 +128,33 @@ public sealed class BackdropWindow : Window
         _last = r;
         _visible = true;
         _radiusPx = radiusPx;
-        // Inset 1 px: the region's stair-stepped edge stays hidden under the dock's anti-aliased rim.
         int w = Math.Max(1, r.Width), h = Math.Max(1, r.Height);
         SetWindowPos(_hwnd, above == IntPtr.Zero ? HWND_TOPMOST : above, r.Left, r.Top, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
         int d = (int)Math.Round(radiusPx * 2);
-        var rgn = CreateRoundRectRgn(1, 1, w, h, d, d);
+        IntPtr rgn;
+        if (_frost != null)
+        {
+            // The frost is clipped by an anti-aliased rounded geometry. The region only keeps clicks in the far corners
+            // passing through: a smaller corner radius, so it never cuts into the clip's soft edge.
+            _frost.Resize(w, h, radiusPx);
+            int dr = (int)Math.Round(radiusPx * 1.2);
+            rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, dr, dr);
+        }
+        // Accent blur: inset 1 px, so the region's stair-stepped edge stays hidden under the dock's anti-aliased rim.
+        else rgn = CreateRoundRectRgn(1, 1, w, h, d, d);
         if (SetWindowRgn(_hwnd, rgn, true) == 0) DeleteObject(rgn);
     }
 
     RECT _last;
     bool _visible;
+    Theming.CompositionFrost? _frost;
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _frost?.Dispose();
+        _frost = null;
+        base.OnClosed(e);
+    }
 
     public void HideBackdrop() { if (_hwnd != IntPtr.Zero && _visible) { ShowWindow(_hwnd, SW_HIDE); _visible = false; } }
 }
